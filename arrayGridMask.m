@@ -27,7 +27,7 @@ else
 end
 
 if nargin<3 || isempty(topLeftCorner)
-    figure, imshow(imadjust(im(1:round(10*rowSpacing),1:round(10*colSpacing))));
+    figure, imshow(im(1:round(10*rowSpacing),1:round(10*colSpacing)));
     [x,y] = ginput(1);
     topLeftCorner = [x y];
 end

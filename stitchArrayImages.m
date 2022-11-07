@@ -42,7 +42,7 @@ if mod(overlap,2)==1
     error('Overlap must be an even number')
 end
 overlap2 = overlap/2;
-
+%overlap3(
 try
 %if exist(fullfile(location,'metadata.txt'),'file')
     imAdapterObj = genericReadAsFrames('metadata.txt',location);
@@ -121,14 +121,14 @@ if numel(imRange)>1
             end
             for j=1:nCols
                 if j==1
-                    colInd = 1:w-overlap2;
-                    subImColInd = 1:w-overlap2;
+                    colInd = 1:w-5;%-overlap2;
+                    subImColInd = 1:w-5;%-overlap2;
                 elseif j==nCols
-                    colInd = (j-1)*(w-overlap)+overlap2+1:W;
-                    subImColInd = overlap2+1:w;
+                    colInd = (j-1)*(w-overlap)+overlap-5+1:W;
+                    subImColInd = overlap-5+1:w;
                 else
-                    colInd =(j-1)*(w-overlap)+overlap2+1:j*(w-overlap)+overlap2;
-                    subImColInd = overlap2+1:w-overlap2;
+                    colInd =(j-1)*(w-overlap)+overlap-5+1:j*(w-overlap)+overlap-5;
+                    subImColInd = overlap-5+1:w-5;%-overlap2;
                 end
                 im = tiffread(imListsPar{k}{i,j});
                 if evenIllumination
@@ -157,14 +157,14 @@ else
         end
         for j=1:nCols
             if j==1
-                colInd = 1:w-overlap2;
-                subImColInd = 1:w-overlap2;
+                colInd = 1:w-5;%-overlap2;
+                subImColInd = 1:w-5;%-overlap2;
             elseif j==nCols
-                colInd = (j-1)*(w-overlap)+overlap2+1:W;
-                subImColInd = overlap2+1:w;
+                colInd = (j-1)*(w-overlap)+overlap-5+1:W;
+                subImColInd = overlap-5+1:w;
             else
-                colInd =(j-1)*(w-overlap)+overlap2+1:j*(w-overlap)+overlap2;
-                subImColInd = overlap2+1:w-overlap2;
+                colInd =(j-1)*(w-overlap)+overlap-5+1:j*(w-overlap)+overlap-5;
+                subImColInd = overlap-5+1:w-5;%-overlap2;
             end
             im = tiffread(imLists{i,j}{1});
             if evenIllumination
