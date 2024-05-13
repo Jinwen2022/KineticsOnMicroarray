@@ -52,7 +52,11 @@ spotCentroids(:,2:2:end,2) = round(YY);
 se = strel('disk',radius,8);
 mask = imdilate(mask,se);
 if debugFlag
+<<<<<<< HEAD
     figure, imshow(im,contrast), hold on
+=======
+    figure, imshow(im,[0,660]), hold on
+>>>>>>> ec85aa6c343fe08d5df7c9a42a4c1d92269b8576
     B = bwboundaries(mask,'noholes');
     visboundaries(B,'EnhanceVisibility',0,'LineWidth',1);
 end

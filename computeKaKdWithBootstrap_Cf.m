@@ -1,4 +1,4 @@
-function [ka,kd,eq,dna,dnaTable,kaStderror,kdStderror,eqStderror,nSpots]=computeKaKdWithBootstrap_Cf(varargin)
+function [ka,kd,eq,dnaValues,dna,dnaTable,kaStderror,kdStderror,eqStderror,dnaValuesStderror,nSpots]=computeKaKdWithBootstrap_Cf(varargin)
 % Computes average association and disassociation rates per operator
 % sequence using the average curve method and linear fit. Standard errors
 % of the mean are estimated using 500 bootstraping resamples.
@@ -108,32 +108,39 @@ seqIndices = seqIndices(ind);
 ka = nan(1,numel(seqIndices));
 kd = nan(1,numel(seqIndices));
 eq = nan(1,numel(seqIndices));
+dnaValues = nan(1,numel(seqIndices));
 kaStderror = nan(1,numel(seqIndices));
 kdStderror = nan(1,numel(seqIndices));
 eqStderror = nan(1,numel(seqIndices));
+dnaValuesStderror =  nan(1,numel(seqIndices));
 nSpots  = nan(1,numel(seqIndices));
 rng(1);
 Nboot = 500;
+
 parfor i=1:numel(seqIndices)
     operatorValues = cell2mat(spotIntensities(seqIndices{i}))-meanRandSeqValues;
     operatorDNAValues= cell2mat(dnaIntensities(seqIndices{i}));
     meanOperatorValues = trimmean(operatorValues,trimCutoff,1);
     meanDNAValues = trimmean(operatorDNAValues,trimCutoff,1);
-    numG = count(dna{i},'G')-count(primer,'G');
+    numG = count(dna{i},'G')-count(primer,'G');%dCTP was labelled with Cy5, counting G in ssDNA on Aglient is counting incoportated dCTP-Cy5
     ka(i)= computeKa_Cf(meanDNAValues,meanOperatorValues,time,framesA,lacIConcentration,numG);
     kd(i) = computeKd(meanOperatorValues,time,framesD,'linear','Threshold',kdThreshold);
     eq(i) = mean(meanOperatorValues(framesE));
+    dnaValues(i)=meanDNAValues;
     %Bootstrap
     nSpots(i) = size(operatorValues,1);
     kaBootstr = nan(1,Nboot);
     kdBootstr = nan(1,Nboot);
     eqBootstr = nan(1,Nboot);
+    dnaValuesBootstr = nan(1,Nboot);
     for j=1:Nboot
         spotIndices = ceil(rand(1,nSpots(i))*nSpots(i));
         meanOperatorValues = trimmean(operatorValues(spotIndices,:),trimCutoff,1);
+        meanDNAValues = trimmean(operatorDNAValues(spotIndices,:),trimCutoff,1);
         kaBootstr(j) = computeKa_Cf(meanDNAValues,meanOperatorValues,time,framesA,lacIConcentration,numG);
         kdBootstr(j) = computeKd(meanOperatorValues,time,framesD,'linear','Threshold',kdThreshold);
         eqBootstr(j) = mean(meanOperatorValues(framesE));
+        dnaValuesBootstr(j) = meanDNAValues;
     end
     kaStderror(i) = std(rmoutliers(kaBootstr,'median'));
     kdStderror(i) = std(rmoutliers(kdBootstr,'median'));
@@ -141,15 +148,18 @@ parfor i=1:numel(seqIndices)
 %         rr=1;
 %     end
     eqStderror(i) = std(rmoutliers(eqBootstr,'median'));
+    dnaValuesStderror(i) = std(rmoutliers(dnaValuesBootstr,'median'))
 end
 %% Remove nan values
 ind = ~isnan(ka) & ~isnan(kd);
 ka = ka(ind);
 kd = kd(ind);
 eq = eq(ind);
+dnaValues = dnaValues(ind);
 dna = dna(ind);
 dnaTable = dnaTable(ind,:,:);
 kaStderror = kaStderror(ind);
 kdStderror = kdStderror(ind);
 eqStderror = eqStderror(ind);
+dnaValuesStderror = dnaValuesStderror(ind);
 nSpots = nSpots(ind);
