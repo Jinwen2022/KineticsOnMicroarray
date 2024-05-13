@@ -1,4 +1,4 @@
-function [mask,topLeftCorner, spotCentroids] = arrayGridMask(im,pxSize,topLeftCorner,debugFlag,contrast)
+function [mask,topLeftCorner, spotCentroids] = arrayGridMask_temp(im,pxSize,topLeftCorner,debugFlag,contrast)
 % Creates a binary mask of microarray spots for a microarray with either
 % 96x164 or 266x170 spots.
 % The spot radius is only 90% of the real radius in order to deal with
@@ -15,7 +15,9 @@ function [mask,topLeftCorner, spotCentroids] = arrayGridMask(im,pxSize,topLeftCo
 
 colSpacing = 0.127*1000/pxSize;
 rowSpacing = 0.073323*1000/pxSize;
-radius = round(0.9*10*pxSize);
+radius = round(0.9*16/pxSize);
+
+% radius = round(0.9*10*pxSize/2.5);
 if size(im,1)>rowSpacing*265 && size(im,2)>colSpacing*84
     NROWS = 266;
     NCOLS = 85;
@@ -27,7 +29,7 @@ else
 end
 
 if nargin<3 || isempty(topLeftCorner)
-    figure, imshow(im(1:round(10*rowSpacing),1:round(10*colSpacing)),[0,660]);
+    figure, imshow(im(1:round(10*rowSpacing),1:round(10*colSpacing)),[0,2000]);
     [x,y] = ginput(1);
     topLeftCorner = [x y];
 end
@@ -49,22 +51,10 @@ rcenters = [rcenters; round([XX(:) YY(:)])];
 mask(sub2ind(size(mask),rcenters(:,2),rcenters(:,1))) = 1;
 spotCentroids(:,2:2:end,1) = round(XX);
 spotCentroids(:,2:2:end,2) = round(YY);
-se = strel('disk',radius,8);
+se = strel('disk',radius,0);
 mask = imdilate(mask,se);
 if debugFlag
-<<<<<<< HEAD
-    figure, imshow(im,[0,660]), hold on
-=======
-<<<<<<< HEAD
-    figure, imshow(im,[0,660]), hold on
-=======
-<<<<<<< HEAD
     figure, imshow(im,contrast), hold on
-=======
-    figure, imshow(im,[0,660]), hold on
->>>>>>> ec85aa6c343fe08d5df7c9a42a4c1d92269b8576
->>>>>>> 824d11ea3e0a815643ac501cfcfcf2f9f3572d60
->>>>>>> 8dfb5a1631a80d99bcb3dae40143bcc7a9849c16
     B = bwboundaries(mask,'noholes');
     visboundaries(B,'EnhanceVisibility',0,'LineWidth',1);
 end

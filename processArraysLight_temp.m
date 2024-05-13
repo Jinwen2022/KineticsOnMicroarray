@@ -1,4 +1,4 @@
-function [ValuesCy5, mask, bkg] = processArraysLight_Cy5(dirCy5,dirOffset,parameters,badSpots)
+function [valuesCy3, mask, bkg] = processArraysLight_temp(dirCy3,dirOffset,parameters,badSpots)
 % Performs analysis of specific operator binding experiments using
 % microarrays. Only Cy3 images are being analysed and preprocessed images
 % are not saved.
@@ -49,7 +49,7 @@ end
 %% Compute spot mask and background mask
 imSize = parameters.roi([4 3])+1;
 slide = zeros(imSize);
-mask = arrayGridMask(slide,parameters.pxSize,parameters.topLeftCorner);
+mask = arrayGridMask_temp(slide,parameters.pxSize,parameters.topLeftCorner);
 if nargout==3
     computeBkg = true;
     bkgMask = false(imSize);
@@ -64,10 +64,25 @@ else
     computeBkg = false;
 end
 %% Preprocess Cy3 images and extract spot intensities
+tmpValuesCy3 = cell(1,numel(dirCy3));
 if computeBkg
     bkg = [];
 end
-[ValuesCy5, currBkg] = computeSpotIntensitiesFromRawData(dirCy5,parameters.overlap,parameters.angularDisplacementTile,parameters.rangePositions,[],[],parameters.angularDisplacement,parameters.roi,offset,mask,bkgMask);
-if computeBkg
-   bkg =  currBkg;
+for i=1:numel(dirCy3)
+    [tmpValuesCy3{i}, currBkg] = computeSpotIntensitiesFromRawData(dirCy3{i},parameters.overlap,parameters.angularDisplacementTile,parameters.rangePositions,[],[],parameters.angularDisplacement,parameters.roi,offset,mask,bkgMask);
+    if computeBkg
+        bkg = [bkg currBkg];
+    end
+end
+%% Compound spot intensities array
+[nRows,nCols] = size(tmpValuesCy3{1});
+valuesCy3 = cell(nRows, nCols);
+for i = 1:nRows
+    for j = 1:nCols
+        val = [];
+        for k=1:numel(dirCy3)
+            val = [val tmpValuesCy3{k}{i,j}];
+        end
+        valuesCy3{i,j} = val;
+    end
 end
