@@ -69,5 +69,5 @@ if computeBkg
 end
 [ValuesCy5, currBkg] = computeSpotIntensitiesFromRawData(dirCy5,parameters.overlap,parameters.angularDisplacementTile,parameters.rangePositions,[],[],parameters.angularDisplacement,parameters.roi,offset,mask,bkgMask);
 if computeBkg
-   bkg = [bkg currBkg];
+   bkg =  currBkg;
 end

@@ -1,4 +1,4 @@
-function heatscatter(X, Y, numbins,lims, ax,numToShow,markersize, marker, plot_colorbar, xlab, ylab, title)
+function heatscatter_overlap(X, Y, numbins,lims, ax,numToShow,markersize, marker, plot_colorbar, xlab, ylab, title)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% heatscatter(X, Y, numbins,lims, ax,numToShow, markersize, marker, plot_colorbar, plot_lsf, xlab, ylab, title)
 % mandatory:
@@ -48,15 +48,7 @@ function heatscatter(X, Y, numbins,lims, ax,numToShow,markersize, marker, plot_c
         ax = gca;
     end
     if ~exist('markersize','var') || isempty(markersize)
-<<<<<<< HEAD
-        markersize = 77;
-=======
-<<<<<<< HEAD
-        markersize = 77;
-=======
-        markersize = 30;
->>>>>>> dba439a7c8255a67193fff196b5b04e036733833
->>>>>>> 1922fda1d52536b4bf47535f496ab3c8369ffdf1
+        markersize = 10;
     else
         % force number, not char input
         markersize = str2double(markersize);
@@ -151,7 +143,7 @@ function heatscatter(X, Y, numbins,lims, ax,numToShow,markersize, marker, plot_c
 %     figure();
 %     ax=gcf;
     scatter(X(1:numToShow), Y(1:numToShow), markersize, scatter_COL(1:numToShow), marker);
-    colormap(ax,cool)
+    colormap(ax, flipud(hot))
     
     if (plot_colorbar)
         colorbar;
