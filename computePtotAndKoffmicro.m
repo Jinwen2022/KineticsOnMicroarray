@@ -6,8 +6,8 @@ end
 [sortedkavals,sortinds]=sort(kavals(okinds),'descend');
 tempkdvals=kdvals(okinds);
 sortedkdvals=tempkdvals(sortinds);
-kavalscurr=sortedkavals(1:round(sum(okinds)*kamaxfrac));
-kdvalscurr=sortedkdvals(1:numel(kavalscurr));
+kavalscurr=sortedkavals(round(0.03*numel(sortedkavals)):round(sum(okinds)*kamaxfrac));%removed top 1% ka values that might be abnormal 
+kdvalscurr=sortedkdvals(round(0.03*numel(sortedkavals)):round(sum(okinds)*kamaxfrac));
 
 normX=std(kdvalscurr);
 normY=std(kavalscurr);

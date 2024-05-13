@@ -51,12 +51,16 @@ if makePlot && isfinite(kd)
         f=polyval(fitObj,x);
     elseif strcmp(fittype,'exp')
         f=fitObj(x);
-    end 
+    end
+    f=polyval(fitObj,x);
+    plot(ax,x,y,'o',x,f,'-');
+    hold on
+    f=fitObj(x);
     plot(ax,x,y,'o',x,f,'-');
     if strcmp(fittype,'exp')
         hold(ax,'on')
         f0=exp(-kd0*x);
-        plot(ax,x,f0,'r--');
+        plot(ax,x,f0,'b--');
         hold(ax,'off')
     end
 end

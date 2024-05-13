@@ -1,4 +1,4 @@
-function heatscatter(X, Y, numbins,lims, ax,numToShow,markersize, marker, plot_colorbar, xlab, ylab, title)
+function heatscatter_overlap(X, Y, proteinColor,numbins,lims, ax,numToShow,markersize, marker, plot_colorbar, xlab, ylab, title)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% heatscatter(X, Y, numbins,lims, ax,numToShow, markersize, marker, plot_colorbar, plot_lsf, xlab, ylab, title)
 % mandatory:
@@ -48,7 +48,7 @@ function heatscatter(X, Y, numbins,lims, ax,numToShow,markersize, marker, plot_c
         ax = gca;
     end
     if ~exist('markersize','var') || isempty(markersize)
-        markersize = 30;
+        markersize = 100;
     else
         % force number, not char input
         markersize = str2double(markersize);
@@ -138,12 +138,20 @@ function heatscatter(X, Y, numbins,lims, ax,numToShow,markersize, marker, plot_c
     
     %Show density in the colorbar instead of number of operators
     scatter_COL=scatter_COL*(numToShow)/numel(X);
+    scatter(ax,X(1:numToShow), Y(1:numToShow), markersize, scatter_COL(1:numToShow), marker);
     
-
-%     figure();
-%     ax=gcf;
-    scatter(X(1:numToShow), Y(1:numToShow), markersize, scatter_COL(1:numToShow), marker);
-    colormap(ax,cool)
+    numColors = 256;  % or however many you want
+%     startColor = [1, 1, 1];  % White
+    endColor = proteinColor;  
+        blendFactor = 0.6; 
+        dilutedColor = endColor + blendFactor * (1 - endColor);
+    startColor = dilutedColor;
+%     endColor = [0, 0, 0];
+    
+    customColormap = [linspace(startColor(1), endColor(1), numColors)', ...
+                    linspace(startColor(2), endColor(2), numColors)', ...
+                    linspace(startColor(3), endColor(3), numColors)'];
+    colormap(ax,customColormap)
     
     if (plot_colorbar)
         colorbar;
