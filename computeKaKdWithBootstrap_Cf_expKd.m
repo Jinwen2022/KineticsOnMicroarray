@@ -1,4 +1,4 @@
-function [ka,kd,eq,dna,dnaTable,kaStderror,kdStderror,eqStderror,nSpots]=computeKaKdWithBootstrap_Cf(varargin)
+function [ka,kd,eq,dna,dnaTable,kaStderror,kdStderror,eqStderror,nSpots]=computeKaKdWithBootstrap_Cf_expKd(varargin)
 % Computes average association and disassociation rates per operator
 % sequence using the average curve method and linear fit. Standard errors
 % of the mean are estimated using 500 bootstraping resamples.
@@ -119,9 +119,9 @@ parfor i=1:numel(seqIndices)
     operatorDNAValues= cell2mat(dnaIntensities(seqIndices{i}));
     meanOperatorValues = trimmean(operatorValues,trimCutoff,1);
     meanDNAValues = trimmean(operatorDNAValues,trimCutoff,1);
-    numG = count(dna{i},'G')-count(primer,'G');%dCTP was labelled with Cy5, counting G in ssDNA on Aglient is counting incoportated dCTP-Cy5
+    numG = count(dna{i},'G')-count(primer,'G');
     ka(i)= computeKa_Cf(meanDNAValues,meanOperatorValues,time,framesA,lacIConcentration,numG);
-    kd(i) = computeKd(meanOperatorValues,time,framesD,'linear','Threshold',kdThreshold);
+    kd(i) = computeKd_exp(meanOperatorValues,time,framesD,'exp','Threshold',kdThreshold,'StartPoint',[0.0007 0.00006]);
     eq(i) = mean(meanOperatorValues(framesE));
     %Bootstrap
     nSpots(i) = size(operatorValues,1);
@@ -132,7 +132,7 @@ parfor i=1:numel(seqIndices)
         spotIndices = ceil(rand(1,nSpots(i))*nSpots(i));
         meanOperatorValues = trimmean(operatorValues(spotIndices,:),trimCutoff,1);
         kaBootstr(j) = computeKa_Cf(meanDNAValues,meanOperatorValues,time,framesA,lacIConcentration,numG);
-        kdBootstr(j) = computeKd(meanOperatorValues,time,framesD,'linear','Threshold',kdThreshold);
+        kdBootstr(j) = computeKd_exp(meanOperatorValues,time,framesD,'exp','Threshold',kdThreshold);
         eqBootstr(j) = mean(meanOperatorValues(framesE));
     end
     kaStderror(i) = std(rmoutliers(kaBootstr,'median'));
