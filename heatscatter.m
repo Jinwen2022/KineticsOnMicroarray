@@ -48,7 +48,19 @@ function heatscatter(X, Y, numbins,lims, ax,numToShow,markersize, marker, plot_c
         ax = gca;
     end
     if ~exist('markersize','var') || isempty(markersize)
-        markersize = 10;
+<<<<<<< HEAD
+        markersize = 77;
+=======
+<<<<<<< HEAD
+        markersize = 77;
+=======
+<<<<<<< HEAD
+        markersize = 77;
+=======
+        markersize = 30;
+>>>>>>> dba439a7c8255a67193fff196b5b04e036733833
+>>>>>>> 1922fda1d52536b4bf47535f496ab3c8369ffdf1
+>>>>>>> ec85aa6c343fe08d5df7c9a42a4c1d92269b8576
     else
         % force number, not char input
         markersize = str2double(markersize);
