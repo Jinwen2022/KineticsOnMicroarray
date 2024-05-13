@@ -27,7 +27,7 @@ else
 end
 
 if nargin<3 || isempty(topLeftCorner)
-    figure, imshow(im(1:round(10*rowSpacing),1:round(10*colSpacing)));
+    figure, imshow(im(1:round(10*rowSpacing),1:round(10*colSpacing)),[0,660]);
     [x,y] = ginput(1);
     topLeftCorner = [x y];
 end
@@ -52,7 +52,7 @@ spotCentroids(:,2:2:end,2) = round(YY);
 se = strel('disk',radius,8);
 mask = imdilate(mask,se);
 if debugFlag
-    figure, imshow(imadjust(im)), hold on
+    figure, imshow(im,[0,660]), hold on
     B = bwboundaries(mask,'noholes');
     visboundaries(B,'EnhanceVisibility',0,'LineWidth',1);
 end

@@ -1,4 +1,4 @@
-function [outMeans, outSems] = plotAverageSpotIntensity(varargin)
+function [myLines,outMeans, outSems] = plotAverageSpotIntensity(varargin)
 % Computes mean spot intensity per operator in each frame. Optionally,
 % subtracts spot intensity of a given random sequence.
 % The function plots resulting average spot intensity curves per operator
@@ -64,6 +64,8 @@ ip.addParameter('LineStyle','-',@(x) ischar(x) | isstring(x));
 ip.addParameter('LineWidth',1,@(x) isnumeric(x));
 ip.addParameter('alphaScale',1,@(x) isnumeric(x) & (x>=0) & (x<=1));
 ip.addParameter('Percent',30,@(x) isnumeric(x) && numel(x)==1 && x>=0 && x<=100);
+ip.addParameter('Handle',false,@(x) islogical(x) | (x==0) | (x==1));
+
 ip.parse(varargin{:});
 
 dnaSequences = ip.Results.dnaSequences;
@@ -77,6 +79,7 @@ linestyle = ip.Results.LineStyle;
 linewidth = ip.Results.LineWidth;
 alphaScale = ip.Results.alphaScale;
 percent = ip.Results.Percent;
+linesHandle = ip.Results.Handle;
 
 if ~iscell(operatorSequences)
     operatorSequences = {operatorSequences};
@@ -88,6 +91,10 @@ if isempty(colors)
     colors = lines(numel(operatorSequences));
     colors = mat2cell(colors,ones(size(colors,1),1));
 end
+if linesHandle
+    myLines=[];
+end
+
 %% Main code
 if isempty(randSequence)
     meanRandSeqValues = 0;
@@ -96,7 +103,7 @@ else
     randSeqArrayValues = cell2mat(spotIntensities(randSeqIndex));
     meanRandSeqValues = trimmean(randSeqArrayValues,percent,1);
 end
-if errorbarFlag || nargout==2
+if errorbarFlag || nargout==3
     sems = cell(size(operatorSequences));
 end
 hold on
@@ -107,13 +114,18 @@ for i=1:numel(operatorSequences)
         operatorArrayValues = cell2mat(spotIntensities(operatorIndex));
         meanOperatorValues{i} = trimmean(operatorArrayValues,percent,1);
         meanOperatorValues{i} = meanOperatorValues{i}-meanRandSeqValues;
-        if errorbarFlag || nargout==2
+        if errorbarFlag || nargout==3
             sems{i} = std(operatorArrayValues,0,1)/sqrt(size(operatorArrayValues,2));
         end
         if errorbarFlag
             p=errorbar(ax,timeArray,meanOperatorValues{i},sems{i},sems{i},linestyle,'Color',colors{i},'LineWidth',linewidth);
         else
-            p=plot(ax,timeArray,meanOperatorValues{i},linestyle,'Color',colors{i},'LineWidth',linewidth);
+            if linesHandle
+                p=plot(ax,timeArray,meanOperatorValues{i},linestyle,'Color',colors{i},'LineWidth',linewidth);
+                myLines(end+1) = p;
+            else
+                p=plot(ax,timeArray,meanOperatorValues{i},linestyle,'Color',colors{i},'LineWidth',linewidth);
+            end
         end
         if alphaScale<1
             p.Color(4) = alphaScale;
@@ -124,7 +136,7 @@ end
 %% Handle output if required
 if nargout
     outMeans = meanOperatorValues;
-    if nargout==2
+    if nargout==3
         outSems = sems;
     end
 end
