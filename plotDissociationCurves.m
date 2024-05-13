@@ -1,4 +1,4 @@
-function plotDissociationCurves(varargin)
+function [myLines] = plotDissociationCurves(varargin)
 % Similar to plotAverageSpotIntensity but plot only dissociation curves
 % and require the starting frame of dissociation to normalize fluorescence
 % curves by the fluorescence at the beginning of dissociation.
@@ -22,6 +22,8 @@ ip.addParameter('LineStyle','-',@(x) ischar(x) | isstring(x));
 ip.addParameter('LineWidth',1,@(x) isnumeric(x));
 ip.addParameter('alphaScale',1,@(x) isnumeric(x) & (x>=0) & (x<=1));
 ip.addParameter('Percent',30,@(x) isnumeric(x) && numel(x)==1 && x>=0 && x<=100);
+ip.addParameter('Handle',false,@(x) islogical(x) | (x==0) | (x==1));
+
 ip.parse(varargin{:});
 
 dnaSequences = ip.Results.dnaSequences;
@@ -35,6 +37,7 @@ linestyle = ip.Results.LineStyle;
 linewidth = ip.Results.LineWidth;
 alphaScale = ip.Results.alphaScale;
 percent = ip.Results.Percent;
+linesHandle = ip.Results.Handle;
 
 if ~iscell(operatorSequences)
     operatorSequences = {operatorSequences};
@@ -45,6 +48,10 @@ end
 if isempty(colors)
     colors = lines(numel(operatorSequences));
     colors = mat2cell(colors,ones(size(colors,1),1));
+end
+
+if linesHandle
+    myLines=[];
 end
 %% Main code
 if isempty(randSequence)
@@ -63,7 +70,12 @@ for i=1:numel(operatorSequences)
         meanOperatorValues = trimmean(operatorArrayValues,percent,1);
         meanOperatorValues = meanOperatorValues-meanRandSeqValues;
         dissocValues = meanOperatorValues(startFrame:end)/meanOperatorValues(startFrame);
-        p=plot(ax,dissocTime,dissocValues,linestyle,'Color',colors{i},'LineWidth',linewidth);
+        if linesHandle
+             p = plot(ax,dissocTime,dissocValues,linestyle,'Color',colors{i},'LineWidth',linewidth);
+             myLines(end+1) = p;
+        else
+            p=plot(ax,dissocTime,dissocValues,linestyle,'Color',colors{i},'LineWidth',linewidth);
+        end
         if alphaScale<1
             p.Color(4) = alphaScale;
         end
