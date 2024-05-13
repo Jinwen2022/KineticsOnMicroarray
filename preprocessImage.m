@@ -18,11 +18,19 @@ if nargin<3
 end
 
 if isempty(angularDisplacement)
+<<<<<<< HEAD
     angularDisplacement = getAngularDisplacement(imadjust(im,[0,0.05]));
+=======
+    angularDisplacement = getAngularDisplacement(imadjust(im,[0,0.01]));
+>>>>>>> dba439a7c8255a67193fff196b5b04e036733833
 end
 im = imrotate(im,angularDisplacement,'bilinear');
 
 if isempty(cropRoi)
+<<<<<<< HEAD
     cropRoi = getROI(imadjust(im,[0,0.05]),'Crop array');
+=======
+    cropRoi = getROI(imadjust(im,[0,0.01]),'Crop array');
+>>>>>>> dba439a7c8255a67193fff196b5b04e036733833
 end
 im = imcrop(im,cropRoi);
