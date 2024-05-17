@@ -34,6 +34,9 @@ end
 if nargin<4
     debugFlag = false;
 end
+if nargin<5
+    contrast = [0 660];
+end
 
 spotCentroidsX = topLeftCorner(1):colSpacing:colSpacing*NCOLS;
 spotCentroidsY = topLeftCorner(2):rowSpacing:rowSpacing*NROWS;
@@ -52,19 +55,7 @@ spotCentroids(:,2:2:end,2) = round(YY);
 se = strel('disk',radius,8);
 mask = imdilate(mask,se);
 if debugFlag
-<<<<<<< HEAD
-    figure, imshow(im,[0,660]), hold on
-=======
-<<<<<<< HEAD
-    figure, imshow(im,[0,660]), hold on
-=======
-<<<<<<< HEAD
     figure, imshow(im,contrast), hold on
-=======
-    figure, imshow(im,[0,660]), hold on
->>>>>>> ec85aa6c343fe08d5df7c9a42a4c1d92269b8576
->>>>>>> 824d11ea3e0a815643ac501cfcfcf2f9f3572d60
->>>>>>> 8dfb5a1631a80d99bcb3dae40143bcc7a9849c16
     B = bwboundaries(mask,'noholes');
     visboundaries(B,'EnhanceVisibility',0,'LineWidth',1);
 end
