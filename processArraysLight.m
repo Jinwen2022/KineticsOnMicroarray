@@ -1,43 +1,39 @@
-function [valuesCy3, mask, bkg] = processArraysLight(dirCy3,dirOffset,parameters,badSpots)
+function [fluoValues, mask] = processArraysLight(dirFluo,dirOffset,parameters)
 % Performs analysis of specific operator binding experiments using
-% microarrays. Only Cy3 images are being analysed and preprocessed images
-% are not saved.
+% microarrays without saving preprocessed images. Handles either Cy3 or Cy5
+% images.
 %
 % Input:
-%   dirCy3 - cell array, each element is a path to directory with Cy3
-%            fluorescence images.
-%   dirOffset - path to directory with an offset Cy3 image, used for
+%   dirFluo - Path to directory (or cell array with paths to directories)
+%            with fluorescence images. Or a directory
+%   dirOffset - path to directory with an offset image for
 %               background subtraction. If empty no background subtraction.
 %   parameters - scructure array with fields:
 %       overlap - number of tile overlapping pixels.
 %       angularDisplacementTile - in degrees, rotate counter-clockwise
 %                                 raw images (tiles).
 %       angularDisplacement - in degrees, rotate counter-clockwise
-%                             merged Cy3 images.
-%       rangePositions - array with position indices in Cy3. If empty,
+%                             merged images.
+%       rangePositions - array with position indices. If empty,
 %                           all positions are used. Default [].
-%       roi - cropping region in Cy3 images after rotation.
+%       roi - cropping region to crop images after rotation.
 %       pxSize - pixel size in mum.
 %       topLeftCorner - [x y] coordinates of the centroid of the
 %                       (imaginary) spot in the top left corner of
 %                       preprocessed image.
-%   badSpots - mask of spots to be excluded for computing average
-%              background. Optional, default [].
 %
 % Output:
-%   valuesCy3 - cell 2D array, each element corresponds to a microarray
-%               spot and contains a vector of spot intensities in Cy3
-%               sorted by image acquisition time.
-%   mask - boolean matrix of microarray spots in the preprocessed images.
-%   bkg - array with median background intensity. Optional.
+%   fluoValues - 3D (or 2D for Cy5) array, where (f,i,j) is the intensity
+%                of microarray spot (i,j) at acquisition frame f.
+%   mask - labelled image of microarray spots in the preprocessed images.
 %
-% Spartak Zikrin, Elf lab, 2021-09-12.
+% Spartak Zikrin, Elf lab, 2024-05-17.
 %% Parse parameters
 if ~isfield(parameters,'rangePositions')
     parameters.rangePositions = [];
 end
-if nargin<4
-    badSpots = [];
+if ~iscell(dirFluo)
+    dirFluo = {dirFluo};
 end
 %% Preprocess offset image if it is available
 if ~isempty(dirOffset)
@@ -49,40 +45,13 @@ end
 %% Compute spot mask and background mask
 imSize = parameters.roi([4 3])+1;
 slide = zeros(imSize);
-mask = arrayGridMask(slide,parameters.pxSize,parameters.topLeftCorner);
-if nargout==3
-    computeBkg = true;
-    bkgMask = false(imSize);
-    rowSpacing = 0.073323*1000/parameters.pxSize;
-    props = regionprops(imtranslate(mask,[0 rowSpacing/2]),'Centroid');
-    props = props(~badSpots);
-    for i=1:numel(props)
-        bkgMask(round(props(i).Centroid(2))-2:round(props(i).Centroid(2))+2,round(props(i).Centroid(1))-2:round(props(i).Centroid(1))+2)=true;
-    end
-else
-    bkgMask = [];
-    computeBkg = false;
-end
+[mask, ~, ~, bkgMask] = arrayGridMask(slide,parameters.pxSize,parameters.topLeftCorner);
 %% Preprocess Cy3 images and extract spot intensities
-tmpValuesCy3 = cell(1,numel(dirCy3));
-if computeBkg
-    bkg = [];
+tmpValuesCy3 = cell(1,numel(dirFluo));
+for i=1:numel(dirFluo)
+    tmpValuesCy3{i} = computeSpotIntensitiesFromRawData(dirFluo{i},parameters.overlap,parameters.angularDisplacementTile,parameters.rangePositions,[],[],parameters.angularDisplacement,parameters.roi,offset,mask,bkgMask);
 end
-for i=1:numel(dirCy3)
-    [tmpValuesCy3{i}, currBkg] = computeSpotIntensitiesFromRawData(dirCy3{i},parameters.overlap,parameters.angularDisplacementTile,parameters.rangePositions,[],[],parameters.angularDisplacement,parameters.roi,offset,mask,bkgMask);
-    if computeBkg
-        bkg = [bkg currBkg];
-    end
-end
-%% Compound spot intensities array
-[nRows,nCols] = size(tmpValuesCy3{1});
-valuesCy3 = cell(nRows, nCols);
-for i = 1:nRows
-    for j = 1:nCols
-        val = [];
-        for k=1:numel(dirCy3)
-            val = [val tmpValuesCy3{k}{i,j}];
-        end
-        valuesCy3{i,j} = val;
-    end
+fluoValues = vertcat(tmpValuesCy3{:});
+if size(fluoValues,1)==1 % Cy5 case, reshape as 2D array.
+    fluoValues = reshape(fluoValues,size(fluoValues,2),size(fluoValues,3));
 end

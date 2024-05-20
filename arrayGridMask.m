@@ -1,6 +1,7 @@
-function [mask,topLeftCorner, spotCentroids] = arrayGridMask(im,pxSize,topLeftCorner,debugFlag,contrast)
-% Creates a binary mask of microarray spots for a microarray with either
-% 96x164 or 266x170 spots.
+function [mask,topLeftCorner, spotCentroids, bkgMask] = arrayGridMask(im,pxSize,topLeftCorner,debugFlag,contrast)
+% Creates a labelled mask of microarray spots for a microarray with either
+% 96x164 or 266x170 spots, and optionally a labelled mask for local
+% background subtraction.
 % The spot radius is only 90% of the real radius in order to deal with
 % the potential misalignment of the spot mask with images.
 %
@@ -12,6 +13,18 @@ function [mask,topLeftCorner, spotCentroids] = arrayGridMask(im,pxSize,topLeftCo
 %                   set using gui.  Default [].
 %   debugFlag - optional, if true plot image with spot outlines. Default
 %               false.
+%   contrast - a tuple with upper and lower pixel intensity value cut-offs
+%              for image plotting. By default, [0 660].
+%
+% Output:
+%   mask - an image of the same size as im with segmented and labelled
+%          microarray spots;
+%   topLeftCorner - (x,y)-coordinates of the top left microarray spot
+%                   centroid;
+%   spotCentroids - coordinates of all microarray spot centroids
+%   bkgMask - optional, a labelled mask of background pixels around
+%             microarray spots
+
 
 colSpacing = 0.127*1000/pxSize;
 rowSpacing = 0.073323*1000/pxSize;
@@ -42,20 +55,34 @@ spotCentroidsX = topLeftCorner(1):colSpacing:colSpacing*NCOLS;
 spotCentroidsY = topLeftCorner(2):rowSpacing:rowSpacing*NROWS;
 spotCentroids = zeros(NROWS,NCOLS*2,2);
 
-mask = false(size(im));
+ceedMask = zeros(size(im));
 [XX, YY] = meshgrid(spotCentroidsX, spotCentroidsY);
-spotCentroids(:,1:2:end,1) = round(XX);
-spotCentroids(:,1:2:end,2) = round(YY);
+spotCentroids(:,1:2:end,1) = XX;
+spotCentroids(:,1:2:end,2) = YY;
 rcenters = round([XX(:) YY(:)]);
 [XX, YY] = meshgrid(spotCentroidsX+colSpacing/2, spotCentroidsY+rowSpacing/2);
+spotCentroids(:,2:2:end,1) = XX;
+spotCentroids(:,2:2:end,2) = YY;
 rcenters = [rcenters; round([XX(:) YY(:)])];
-mask(sub2ind(size(mask),rcenters(:,2),rcenters(:,1))) = 1;
-spotCentroids(:,2:2:end,1) = round(XX);
-spotCentroids(:,2:2:end,2) = round(YY);
+[~,ind] = sort(rcenters(:,1));
+rcenters = rcenters(ind,:);
+ceedMask(sub2ind(size(ceedMask),rcenters(:,2),rcenters(:,1))) = 1:numel(spotCentroids)/2;
+
 se = strel('disk',radius,8);
-mask = imdilate(mask,se);
+mask = imdilate(ceedMask,se);
 if debugFlag
     figure, imshow(im,contrast), hold on
     B = bwboundaries(mask,'noholes');
     visboundaries(B,'EnhanceVisibility',0,'LineWidth',1);
+end
+
+if nargout==4
+    diskSe = strel('disk',round(1.35*10*pxSize),8);
+    outMask = imdilate(ceedMask,diskSe);
+    rectSe = strel('rectangle',odd([round(rowSpacing*0.95) size(diskSe.Neighborhood,1)+3]));
+    bkgMask = imdilate(ceedMask,rectSe);
+    bkgMask = bkgMask-outMask;
+    if debugFlag
+        figure, imshow(labeloverlay(imadjust(im),bkgMask)),axis image
+    end
 end

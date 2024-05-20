@@ -54,7 +54,7 @@ else
 end
 ip = inputParser();
 ip.addRequired('dnaSequences',@(x) iscell(x));
-ip.addRequired('spotIntensities',@(x) iscell(x));
+ip.addRequired('spotIntensities',@(x) isnumeric(x));
 ip.addRequired('operatorSequences',@(x) iscell(x) || ischar(x) || isstring(x));
 ip.addRequired('randSequence',@(x) isempty(x) || ischar(x) || isstring(x));
 ip.addOptional('timeArray',[],@(x) isnumeric(x));
@@ -100,7 +100,7 @@ if isempty(randSequence)
     meanRandSeqValues = 0;
 else
     randSeqIndex = strcmp(dnaSequences,randSequence);
-    randSeqArrayValues = cell2mat(spotIntensities(randSeqIndex));
+    randSeqArrayValues = spotIntensities(:,randSeqIndex);
     meanRandSeqValues = trimmean(randSeqArrayValues,percent,1);
 end
 if errorbarFlag || nargout==3
@@ -111,8 +111,8 @@ meanOperatorValues = cell(size(operatorSequences));
 for i=1:numel(operatorSequences)
     operatorIndex = strcmp(dnaSequences,operatorSequences{i});
     if any(any(operatorIndex))
-        operatorArrayValues = cell2mat(spotIntensities(operatorIndex));
-        meanOperatorValues{i} = trimmean(operatorArrayValues,percent,1);
+        operatorArrayValues = spotIntensities(:,operatorIndex);
+        meanOperatorValues{i} = trimmean(operatorArrayValues,percent,2);
         meanOperatorValues{i} = meanOperatorValues{i}-meanRandSeqValues;
         if errorbarFlag || nargout==3
             sems{i} = std(operatorArrayValues,0,1)/sqrt(size(operatorArrayValues,2));

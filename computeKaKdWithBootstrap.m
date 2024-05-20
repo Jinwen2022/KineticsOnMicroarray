@@ -5,9 +5,8 @@ function [ka,kd,eq,dna,dnaTable,kaStderror,kdStderror,eqStderror,nSpots]=compute
 %
 % Input:
 %   dnaSequences - 2D cell array with DNA sequences in microarray spots.
-%   spotIntensities - 2D cell array, each element is a vector with average
-%                     spot intensities of the corresponding microarray spot
-%                     over acquisition frames.
+%   spotIntensities - 3D array, where (f,i,j) is the intensity of
+%                     microarray spot (i,j) at acquisition frame f.
 %   operatorSequences - cell array with operator sequences
 %   randSequence - char array with a random DNA sequences used for signal
 %                  subtraction. If '', skip subtraction.
@@ -40,14 +39,13 @@ function [ka,kd,eq,dna,dnaTable,kaStderror,kdStderror,eqStderror,nSpots]=compute
 %% Parse parameters
 ip = inputParser();
 ip.addRequired('dnaSequences',@(x) iscell(x));
-ip.addRequired('spotIntensities',@(x) iscell(x));
+ip.addRequired('spotIntensities',@(x) isnumeric(x));
 ip.addRequired('operatorSequences',@(x) iscell(x));
 ip.addRequired('randSequence',@(x) isempty(x) || ischar(x) || isstring(x));
 ip.addRequired('mutations',@(x) isnumeric(x));
 ip.addRequired('associationFramesLinearFit',@(x) isnumeric(x));
 ip.addRequired('dissociationFramesLinearFit',@(x) isnumeric(x));
 ip.addRequired('equilibriumFrames',@(x) isnumeric(x));
-
 ip.addRequired('timeArray',@(x) isnumeric(x));
 ip.addRequired('lacIConcentration',@(x) isnumeric(x) && numel(x)==1);
 ip.addOptional('kdThreshold',-Inf,@(x) isnumeric(x) && numel(x)==1);
@@ -71,8 +69,8 @@ if isempty(randSeq)
     meanRandSeqValues = 0;
 else
     randSeqIndex = strcmp(dnaSequences,randSeq);
-    randSeqArrays = cell2mat(spotIntensities(randSeqIndex));
-    meanRandSeqValues = trimmean(randSeqArrays,trimCutoff,1);
+    randSeqArrays = spotIntensities(:,randSeqIndex);
+    meanRandSeqValues = trimmean(randSeqArrays,trimCutoff,2);
 end
 %% Compute kd and ka*lacIConcentation using linear fit
 maxMutationNum = length(operatorSequences{1});
@@ -107,9 +105,11 @@ eqStderror = nan(1,numel(seqIndices));
 nSpots  = nan(1,numel(seqIndices));
 rng(1);
 Nboot = 500;
+% create random number stream for reprodicibility
+sc = parallel.pool.Constant(RandStream('Threefry'));
 parfor i=1:numel(seqIndices)
-    operatorValues = cell2mat(spotIntensities(seqIndices{i}))-meanRandSeqValues;
-    meanOperatorValues = trimmean(operatorValues,trimCutoff,1);
+    operatorValues = spotIntensities(:,seqIndices{i})-meanRandSeqValues;
+    meanOperatorValues = trimmean(operatorValues,trimCutoff,2);
     ka(i) = computeKa(meanOperatorValues,time,framesA,1);
     kd(i) = computeKd(meanOperatorValues,time,framesD,'linear','Threshold',kdThreshold);
     eq(i) = mean(meanOperatorValues(framesE));
@@ -118,18 +118,17 @@ parfor i=1:numel(seqIndices)
     kaBootstr = nan(1,Nboot);
     kdBootstr = nan(1,Nboot);
     eqBootstr = nan(1,Nboot);
+    stream = sc.Value;        % Extract the stream from the Constant
+    stream.Substream = i;
     for j=1:Nboot
-        spotIndices = ceil(rand(1,nSpots(i))*nSpots(i));
-        meanOperatorValues = trimmean(operatorValues(spotIndices,:),trimCutoff,1);
+        spotIndices = ceil(rand(stream,1,nSpots(i))*nSpots(i));
+        meanOperatorValues = trimmean(operatorValues(spotIndices,:),trimCutoff,2);
         kaBootstr(j) = computeKa(meanOperatorValues,time,framesA,1);
         kdBootstr(j) = computeKd(meanOperatorValues,time,framesD,'linear','Threshold',kdThreshold);
         eqBootstr(j) = mean(meanOperatorValues(framesE));
     end
     kaStderror(i) = std(rmoutliers(kaBootstr,'median'));
     kdStderror(i) = std(rmoutliers(kdBootstr,'median'));
-%     if isnan(kdStderror(i))
-%         rr=1;
-%     end
     eqStderror(i) = std(rmoutliers(eqBootstr,'median'));
 end
 %% Remove nan values

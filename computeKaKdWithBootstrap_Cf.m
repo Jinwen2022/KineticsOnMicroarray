@@ -5,11 +5,10 @@ function [ka,kd,eq,dna,dnaTable,kaStderror,kdStderror,eqStderror,nSpots]=compute
 %
 % Input:
 %   dnaSequences - 2D cell array with DNA sequences in microarray spots.
-%   spotIntensities - 2D cell array, each element is a vector with average
-%                     spot intensities of the corresponding microarray spot
-%                     over acquisition frames.
-%   dnaIntensities - 2D cell array with spot Intensities represent total DNA
-%                   concentration for this spot.
+%   spotIntensities - 3D array, where (f,i,j) is the intensity of
+%                     microarray spot (i,j) at acquisition frame f.
+%   dnaIntensities - 2D array with Cy5 spot intensities represent total DNA
+%                    concentration for this spot.
 %   operatorSequences - cell array with operator sequences
 %   randSequence - char array with a random DNA sequences used for signal
 %                  subtraction. If '', skip subtraction.
@@ -43,8 +42,8 @@ function [ka,kd,eq,dna,dnaTable,kaStderror,kdStderror,eqStderror,nSpots]=compute
 %% Parse parameters
 ip = inputParser();
 ip.addRequired('dnaSequences',@(x) iscell(x));
-ip.addRequired('spotIntensities',@(x) iscell(x));
-ip.addRequired('dnaIntensities',@(x) iscell(x));
+ip.addRequired('spotIntensities',@(x) isnumeric(x));
+ip.addRequired('dnaIntensities',@(x) isnumeric(x));
 ip.addRequired('operatorSequences',@(x) iscell(x));
 ip.addRequired('randSequence',@(x) isempty(x) || ischar(x) || isstring(x));
 ip.addRequired('mutations',@(x) isnumeric(x));
@@ -78,8 +77,8 @@ if isempty(randSeq)
     meanRandSeqValues = 0;
 else
     randSeqIndex = strcmp(dnaSequences,randSeq);
-    randSeqArrays = cell2mat(spotIntensities(randSeqIndex));
-    meanRandSeqValues = trimmean(randSeqArrays,trimCutoff,1);
+    randSeqArrays = spotIntensities(:,randSeqIndex);
+    meanRandSeqValues = trimmean(randSeqArrays,trimCutoff,2);
 end
 %% Compute kd and ka*lacIConcentation using linear fit
 maxMutationNum = length(operatorSequences{1});
@@ -87,7 +86,6 @@ maxMutationNum = length(operatorSequences{1});
 dna = uDnaSequences;
 dnaTable = false(numel(uDnaSequences),numel(operatorSequences),numel(mutations));
 
-%meanOperatorValues = cell(numel(uDnaSequences),1);
 seqIndices = cell(numel(uDnaSequences),1);
 for i=1:numel(uDnaSequences)
     if numel(uDnaSequences{i}) == maxMutationNum
@@ -112,34 +110,37 @@ kaStderror = nan(1,numel(seqIndices));
 kdStderror = nan(1,numel(seqIndices));
 eqStderror = nan(1,numel(seqIndices));
 nSpots  = nan(1,numel(seqIndices));
-rng(1);
 Nboot = 500;
+numG0 = count(primer,'G');
+% create random number stream for reprodicibility
+sc = parallel.pool.Constant(RandStream('Threefry'));
 parfor i=1:numel(seqIndices)
-    operatorValues = cell2mat(spotIntensities(seqIndices{i}))-meanRandSeqValues;
-    operatorDNAValues= cell2mat(dnaIntensities(seqIndices{i}));
-    meanOperatorValues = trimmean(operatorValues,trimCutoff,1);
-    meanDNAValues = trimmean(operatorDNAValues,trimCutoff,1);
-    numG = count(dna{i},'G')-count(primer,'G');
-    ka(i)= computeKa_Cf(meanDNAValues,meanOperatorValues,time,framesA,lacIConcentration,numG);
+    operatorValues = spotIntensities(:,seqIndices{i})-meanRandSeqValues;
+    operatorDNAValues= dnaIntensities(seqIndices{i})';
+    meanOperatorValues = trimmean(operatorValues,trimCutoff,2);
+    numG = count(dna{i},'G')-numG0;
+    weightedOperatorValues = operatorValues.*(numG/100./operatorDNAValues);
+    meanWeightedOperatorValues = trimmean(weightedOperatorValues,trimCutoff,2);
+    ka(i)= computeKa(meanWeightedOperatorValues,time,framesA,lacIConcentration);
     kd(i) = computeKd(meanOperatorValues,time,framesD,'linear','Threshold',kdThreshold);
     eq(i) = mean(meanOperatorValues(framesE));
     %Bootstrap
-    nSpots(i) = size(operatorValues,1);
+    nSpots(i) = size(operatorValues,2);
     kaBootstr = nan(1,Nboot);
     kdBootstr = nan(1,Nboot);
     eqBootstr = nan(1,Nboot);
+    stream = sc.Value;        % Extract the stream from the Constant
+    stream.Substream = i;
     for j=1:Nboot
-        spotIndices = ceil(rand(1,nSpots(i))*nSpots(i));
-        meanOperatorValues = trimmean(operatorValues(spotIndices,:),trimCutoff,1);
-        kaBootstr(j) = computeKa_Cf(meanDNAValues,meanOperatorValues,time,framesA,lacIConcentration,numG);
+        spotIndices = ceil(rand(stream,1,nSpots(i))*nSpots(i));
+        meanOperatorValues = trimmean(operatorValues(:,spotIndices),trimCutoff,2);
+        meanWeightedOperatorValues = trimmean(weightedOperatorValues(:,spotIndices),trimCutoff,2);
+        kaBootstr(j) = computeKa(meanWeightedOperatorValues,time,framesA,lacIConcentration);
         kdBootstr(j) = computeKd(meanOperatorValues,time,framesD,'linear','Threshold',kdThreshold);
         eqBootstr(j) = mean(meanOperatorValues(framesE));
     end
     kaStderror(i) = std(rmoutliers(kaBootstr,'median'));
     kdStderror(i) = std(rmoutliers(kdBootstr,'median'));
-%     if isnan(kdStderror(i))
-%         rr=1;
-%     end
     eqStderror(i) = std(rmoutliers(eqBootstr,'median'));
 end
 %% Remove nan values

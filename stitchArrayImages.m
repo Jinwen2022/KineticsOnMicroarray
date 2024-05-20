@@ -1,6 +1,6 @@
-function mergedImages = stitchArrayImages(location,overlap,rotationAngle,posColRange,imRange,posRot90,weights)
-% Stich together overlapping images.
-% Images might have to be a bit rotated to be properly aligned.
+function [mergedImages, stitchROI] = stitchArrayImages(location,overlap,rotationAngle,posColRange,imRange,posRot90,weights,offset)
+% Stitches together MxN partially overlapping images.
+% Images might have to be rotated a bit for properly alignment.
 % Code parallelization is used when there are multiple frames.
 %
 % Input:
@@ -17,7 +17,12 @@ function mergedImages = stitchArrayImages(location,overlap,rotationAngle,posColR
 %
 % Output:
 %   mergedImages - cell array with merged images if there are multiple
-%                  frames, or uint16 merged image.
+%                  frames, or a uint16 merged image.
+%   stitchROI - MxNx8 array with border coordinates of MxN tiles:
+%               [xGlobMin xGlobMax yGlobMin yGlobMax
+%                xLocMin  xLocMax  yLocMin  yLocMax],
+%               where "global" coordinates refer to the output images and
+%               "local" coordinates refer to the raw images. Optional.
 
 % Parse input
 if nargin<4
@@ -32,6 +37,9 @@ end
 if nargin<7
     weights = 1;
 end
+if nargin<8
+    offset = 0;
+end
 if numel(weights)>1
     evenIllumination = true;
 else
@@ -42,7 +50,6 @@ if mod(overlap,2)==1
     error('Overlap must be an even number')
 end
 overlap2 = overlap/2;
-%overlap3(
 try
 %if exist(fullfile(location,'metadata.txt'),'file')
     imAdapterObj = genericReadAsFrames('metadata.txt',location);
@@ -131,11 +138,12 @@ if numel(imRange)>1
                     subImColInd = overlap-5+1:w-5;%-overlap2;
                 end
                 im = tiffread(imListsPar{k}{i,j});
-                if evenIllumination
-                    im = uint16(double(im).*weights);
-                end
+                im = im-offset;
                 if rotationAngle
                     im = imrotate(im,rotationAngle,'bilinear','crop');
+                end
+                if evenIllumination
+                    im = uint16(double(im).*weights);
                 end
                 currMergedImage(rowInd,colInd) = im(subImRowInd,subImColInd);
             end
@@ -167,13 +175,43 @@ else
                 subImColInd = overlap-5+1:w-5;%-overlap2;
             end
             im = tiffread(imLists{i,j}{1});
-            if evenIllumination
-                im = uint16(double(im).*weights);
-            end
+            im = im-offset;
             if rotationAngle
                 im = imrotate(im,rotationAngle,'bilinear','crop');
+            end
+            if evenIllumination
+                im = uint16(double(im).*weights);
             end
             mergedImages(rowInd,colInd) = im(subImRowInd,subImColInd);
         end
     end
+end
+if nargout==2
+     stitchROI = zeros(nRows,nCols,8);
+     for i=1:nRows
+        if i==1
+            rowInd = 1:h-overlap2;
+            subImRowInd = 1:h-overlap2;
+        elseif i==nRows
+            rowInd = (i-1)*(h-overlap)+overlap2+1:H;
+            subImRowInd = overlap2+1:h;
+        else
+            rowInd = (i-1)*(h-overlap)+overlap2+1:i*(h-overlap)+overlap2;
+            subImRowInd = overlap2+1:h-overlap2;
+        end
+        for j=1:nCols
+            if j==1
+                colInd = 1:w-5;%-overlap2;
+                subImColInd = 1:w-5;%-overlap2;
+            elseif j==nCols
+                colInd = (j-1)*(w-overlap)+overlap-5+1:W;
+                subImColInd = overlap-5+1:w;
+            else
+                colInd =(j-1)*(w-overlap)+overlap-5+1:j*(w-overlap)+overlap-5;
+                subImColInd = overlap-5+1:w-5;%-overlap2;
+            end
+            stitchROI(i,j,:)=[colInd(1) colInd(end) rowInd(1) rowInd(end)...
+                              subImColInd(1) subImColInd(end) subImRowInd(1) subImRowInd(end)];
+        end
+     end
 end

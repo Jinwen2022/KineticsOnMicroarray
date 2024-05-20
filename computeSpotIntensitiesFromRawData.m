@@ -1,9 +1,8 @@
-function [valuesCy3, bkg] = computeSpotIntensitiesFromRawData(location,overlap,rotAngleTile,posColRange,imRange,weights,rotAngle,roi,offsetIm,mask,bkgMask)
+function valuesCy3 = computeSpotIntensitiesFromRawData(location,overlap,rotAngleTile,posColRange,imRange,weights,rotAngle,roi,offsetIm,mask,bkgMask)
 % This function runs a parfor loop over fluorescent frames of a microarray
 % in a directory. At each iteration, it merges tiles into a full image in
 % the corresponding frame, preprocess the image and extracts average
-% fluorescence intensity per microarray spot. It also computes median
-% background intensity if a background mask is provided.
+% fluorescence intensity per microarray spot.
 %
 % Input:
 %   location - char array, path to microscopy data folder
@@ -11,20 +10,18 @@ function [valuesCy3, bkg] = computeSpotIntensitiesFromRawData(location,overlap,r
 %   rotAngleTile - scalar, rotate images counterclockwise by rotAngleTile degrees.
 %   posColRange - column range of positions. If [] use all positions.
 %   imRange - range of frames. If [] use all frames.
-%   weights - matrix with illumination correction pixel weights. If [] skip
-%             illumination correction
+%   weights - matrix with illumination correction pixel weights. 
+%             If [], skip illumination correction.
 %   rotAngle - scalar, defines counter-clockwise image rotation in degrees.
-%   roi - 4-element vector [XMIN YMIN WIDTH HEIGHT] for image cropping region.
-%   offsetIm -uint16 array (HEIGHT+1)x(WIDTH+1) for background
+%   roi - 4-element vector [XMIN YMIN W H] for image cropping region.
+%   offsetIm -uint16 array (H+1)x(W+1) for background
 %             subrtraction. Or simply 0 scalar. 
-%   mask - binary array (HEIGHT+1)x(WIDTH+1) of microarray spots.
-%   bkgMask - binary array (HEIGHT+1)x(WIDTH+1) of background spots.
+%   mask - binary array (H+1)x(W+1) of microarray spots.
+%   bkgMask - binary array (H+1)x(W+1) of background spots.
 % 
 % Output:
-%   valuesCy3 - cell 2D array, each element corresponds to a microarray
-%               spot and contains a vector of spot intensities in Cy3
-%               sorted by image acquisition time.
-%   bkg - array with median background intensity per frame.
+%   valuesCy3 - 3D array,  where (f,i,j) is the intensity of microarray
+%               spot (i,j) at acquisition frame f.
 %
 % See also: stitchArrayImages, computeSpotIntensities, preprocessImage
 %% Parse parameters
@@ -39,14 +36,6 @@ if isempty(weights)
 else
     evenIllumination = true;
 end
-
-if isempty(bkgMask)
-    computeBkg = false;
-    bkg = [];
-else
-    computeBkg = true;
-end
-
 %% Get image info
 try
     imAdapterObj = genericReadAsFrames('metadata.txt',location);
@@ -107,9 +96,6 @@ for k=1:numel(imRange)
 end
 %% Main code
 tmpValuesCy3 =  cell(1,numel(imRange));
-if computeBkg
-    bkg = zeros(1,numel(imRange));
-end
 parfor k=1:numel(imRange)
     mergedIm = uint16(zeros(H,W));
     for i=1:nRows
@@ -146,19 +132,15 @@ parfor k=1:numel(imRange)
     end
     mergedIm = preprocessImage(mergedIm,rotAngle,roi);
     mergedIm = mergedIm-offsetIm;
-    tmpValuesCy3{k} = computeSpotIntensities(mergedIm,mask);
-    if computeBkg
-        bkg(k) = median(mergedIm(bkgMask));
-    end
+    tmpValuesCy3{k} = computeSpotIntensities(mergedIm,mask,bkgMask);
 end
 %% Rearrange spot intensities array
 [nRows,nCols] = size(tmpValuesCy3{1});
-valuesCy3 = cell(nRows, nCols);
-for i = 1:nRows
-    for j = 1:nCols
-        valuesCy3{i,j} = zeros(1,length(tmpValuesCy3));
-        for k = 1:length(tmpValuesCy3)
-            valuesCy3{i,j}(k)= tmpValuesCy3{k}(i,j);
+valuesCy3 = zeros(numel(tmpValuesCy3),nRows, nCols);
+for k = 1:length(tmpValuesCy3)
+    for i = 1:nRows
+        for j = 1:nCols
+            valuesCy3(k,i,j)= tmpValuesCy3{k}(i,j);
         end 
     end
 end
