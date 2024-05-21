@@ -1,6 +1,6 @@
-function WCy5 = correctIlluminationCy5(dirCy5,parameters, plotFlag)
+function W = correctIlluminationCy5(imDir,parameters, plotFlag)
 
-[imRaw, stitchROI] = stitchArrayImages(dirCy5,parameters.overlap,parameters.angularDisplacementTile,parameters.rangePositions,1,-1);
+[imRaw, stitchROI] = stitchArrayImages(imDir,parameters.overlap,parameters.angularDisplacementTile,parameters.rangePositions,1,-1);
 im = preprocessImage(imRaw,parameters.angularDisplacement,parameters.roi);
 [~,~,Trot] = getAngularDisplacement(imRaw,parameters.angularDisplacement);
 Tcrop = getTranslationMatrix(-parameters.roi+1);
@@ -24,10 +24,16 @@ spotsCoordsRaw = convertCoord(spots,T,1);
 fitdata = [spotsCoordsRaw [stats.MeanIntensity]'];
 fitdata = convertImageToTileCoord(fitdata,stitchROI);
 fitObj = fit(fitdata(:,1:2),fitdata(:,3),'poly21');
-imAdapterObj = genericReadAsFrames('metadata.txt',dirCy5);
+imAdapterObj = genericReadAsFrames('metadata.txt',imDir);
 posList = imAdapterObj.getPositionList();
 chanNames = imAdapterObj.getChannels();
-imInfo = imfinfo(fullfile(dirCy5,posList{1},chanNames{1},'img_000000000.tiff'));
+imInfo = imfinfo(fullfile(imDir,posList{1},chanNames{1},'img_000000000.tiff'));
+
+% subtract camera offset and compute weigths
+[X,Y]=meshgrid(1:imInfo.Width,1:imInfo.Height);
+cameraOffset = 100;
+Z = fitObj(X,Y)-cameraOffset;
+W = max(max(Z))./Z;
 
 if plotFlag
     figure, imshow(labeloverlay(imadjust(im),bkgMask)),axis image
@@ -40,15 +46,10 @@ if plotFlag
     [X,Y] = meshgrid(1:10:imInfo.Width,1:10:imInfo.Height);
     surf(X,Y,fitObj(X,Y))
     zlim(quantile(fitdata(:,3),[0 0.995]))
-    % subtract camera offset and compute weigths
-    [X,Y]=meshgrid(1:imInfo.Width,1:imInfo.Height);
-    cameraOffset = 100;
-    Z = fitObj(X,Y)-cameraOffset;
-    WCy5 = max(max(Z))./Z;
-    
     drawnow
+    
     figure,
-    imagesc(WCy5), 
-    axis image,
+    imagesc(W)
+    axis image
     colorbar
 end
