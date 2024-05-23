@@ -32,6 +32,12 @@ function [fluoValues, mask] = processArraysLight(dirFluo,dirOffset,parameters)
 if ~isfield(parameters,'rangePositions')
     parameters.rangePositions = [];
 end
+if ~isfield(parameters,'weights')
+    parameters.weights = [];
+end
+if ~isfield(parameters,'posColRange')
+    parameters.posColRange = [];
+end
 if ~iscell(dirFluo)
     dirFluo = {dirFluo};
 end
@@ -49,9 +55,8 @@ slide = zeros(imSize);
 %% Preprocess Cy3 images and extract spot intensities
 tmpValuesCy3 = cell(1,numel(dirFluo));
 for i=1:numel(dirFluo)
-    tmpValuesCy3{i} = computeSpotIntensitiesFromRawData(dirFluo{i},parameters.overlap,parameters.angularDisplacementTile,parameters.rangePositions,[],[],parameters.angularDisplacement,parameters.roi,offset,mask,bkgMask);
+    tmpValuesCy3{i} = computeSpotIntensitiesFromRawData(dirFluo{i},parameters.overlap,...
+        parameters.angularDisplacementTile,parameters.rangePositions,parameters.posColRange,...
+        parameters.weights,parameters.angularDisplacement,parameters.roi,offset,mask,bkgMask);
 end
-fluoValues = vertcat(tmpValuesCy3{:});
-if size(fluoValues,1)==1 % Cy5 case, reshape as 2D array.
-    fluoValues = reshape(fluoValues,size(fluoValues,2),size(fluoValues,3));
-end
+fluoValues = squeeze(vertcat(tmpValuesCy3{:}));

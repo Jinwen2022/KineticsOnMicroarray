@@ -144,3 +144,4 @@ eqStderror = eqStderror(ind);
 nSpots = nSpots(ind);
 %% Get ka by deleting by lacI concentration
 ka = ka/lacIConcentration;
+kaStderror = kaStderror/lacIConcentration;

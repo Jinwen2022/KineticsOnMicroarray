@@ -95,7 +95,7 @@ for k=1:numel(imRange)
     end
 end
 %% Main code
-tmpValuesCy3 =  cell(1,numel(imRange));
+tmpValuesCy3 =  cell(numel(imRange),1);
 parfor k=1:numel(imRange)
     mergedIm = uint16(zeros(H,W));
     for i=1:nRows
@@ -135,12 +135,5 @@ parfor k=1:numel(imRange)
     tmpValuesCy3{k} = computeSpotIntensities(mergedIm,mask,bkgMask);
 end
 %% Rearrange spot intensities array
-[nRows,nCols] = size(tmpValuesCy3{1});
-valuesCy3 = zeros(numel(tmpValuesCy3),nRows, nCols);
-for k = 1:length(tmpValuesCy3)
-    for i = 1:nRows
-        for j = 1:nCols
-            valuesCy3(k,i,j)= tmpValuesCy3{k}(i,j);
-        end 
-    end
-end
+valuesCy3 = cell2mat(cellfun(@(x) x(:)',tmpValuesCy3,'UniformOutput',false));
+valuesCy3 = reshape(valuesCy3,[numel(tmpValuesCy3) size(tmpValuesCy3{1})]);
