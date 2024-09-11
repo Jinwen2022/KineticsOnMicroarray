@@ -1,8 +1,9 @@
-function valuesCy3 = computeSpotIntensitiesFromRawData(location,overlap,rotAngleTile,posColRange,imRange,weights,rotAngle,roi,offsetIm,mask,bkgMask)
+function [fluoValues, bkg] = computeSpotIntensitiesFromRawData(location,overlap,rotAngleTile,posColRange,imRange,weights,rotAngle,roi,offsetIm,mask,bkgMask)
 % This function runs a parfor loop over fluorescent frames of a microarray
 % in a directory. At each iteration, it merges tiles into a full image in
 % the corresponding frame, preprocess the image and extracts average
-% fluorescence intensity per microarray spot.
+% fluorescence intensity per microarray spot. It also computes median
+% background intensity if a background mask is provided.
 %
 % Input:
 %   location - char array, path to microscopy data folder
@@ -10,18 +11,21 @@ function valuesCy3 = computeSpotIntensitiesFromRawData(location,overlap,rotAngle
 %   rotAngleTile - scalar, rotate images counterclockwise by rotAngleTile degrees.
 %   posColRange - column range of positions. If [] use all positions.
 %   imRange - range of frames. If [] use all frames.
-%   weights - matrix with illumination correction pixel weights. 
-%             If [], skip illumination correction.
+%   weights - matrix with illumination correction pixel weights. If [] skip
+%             illumination correction
 %   rotAngle - scalar, defines counter-clockwise image rotation in degrees.
-%   roi - 4-element vector [XMIN YMIN W H] for image cropping region.
-%   offsetIm -uint16 array (H+1)x(W+1) for background
+%   roi - 4-element vector [XMIN YMIN WIDTH HEIGHT] for image cropping region.
+%   offsetIm -uint16 array (HEIGHT+1)x(WIDTH+1) for background
 %             subrtraction. Or simply 0 scalar. 
-%   mask - binary array (H+1)x(W+1) of microarray spots.
-%   bkgMask - binary array (H+1)x(W+1) of background spots.
+%   mask - binary array (HEIGHT+1)x(WIDTH+1) of microarray spots.
+%   bkgMask - binary array (HEIGHT+1)x(WIDTH+1) of background spots.
 % 
 % Output:
-%   valuesCy3 - 3D array,  where (f,i,j) is the intensity of microarray
-%               spot (i,j) at acquisition frame f.
+%   valuesCy3 - 3D (or 2D for Cy5) array,  where (f,i,j) is the intensity
+%                of microarray spot (i,j) at acquisition frame f.
+%   bkgValues  - 3D (or 2D for Cy5) array, where (f,i,j) is the average 
+%                pixel intensity in the neighborhood of microarray spot 
+%                (i,j) at acquisition frame f.
 %
 % See also: stitchArrayImages, computeSpotIntensities, preprocessImage
 %% Parse parameters
@@ -95,7 +99,8 @@ for k=1:numel(imRange)
     end
 end
 %% Main code
-tmpValuesCy3 =  cell(numel(imRange),1);
+tmpFluoValues = cell(1,numel(imRange));
+tmpBkg = cell(1,numel(imRange));
 parfor k=1:numel(imRange)
     mergedIm = uint16(zeros(H,W));
     for i=1:nRows
@@ -132,8 +137,17 @@ parfor k=1:numel(imRange)
     end
     mergedIm = preprocessImage(mergedIm,rotAngle,roi);
     mergedIm = mergedIm-offsetIm;
-    tmpValuesCy3{k} = computeSpotIntensities(mergedIm,mask,bkgMask);
+    [tmpFluoValues{k},tmpBkg{k}] = computeSpotIntensities(mergedIm,mask,bkgMask);
 end
-%% Rearrange spot intensities array
-valuesCy3 = cell2mat(cellfun(@(x) x(:)',tmpValuesCy3,'UniformOutput',false));
-valuesCy3 = reshape(valuesCy3,[numel(tmpValuesCy3) size(tmpValuesCy3{1})]);
+%% Rearrange spot intensities into a 3D array
+[nRows,nCols] = size(tmpFluoValues{1});
+fluoValues = zeros(numel(tmpFluoValues),nRows, nCols);
+bkg = zeros(numel(tmpFluoValues),nRows, nCols);
+for k = 1:length(tmpFluoValues)
+    for i = 1:nRows
+        for j = 1:nCols
+            fluoValues(k,i,j)= tmpFluoValues{k}(i,j);
+            bkg(k,i,j)= tmpBkg{k}(i,j);
+        end 
+    end
+end

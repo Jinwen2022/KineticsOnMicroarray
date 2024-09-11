@@ -1,4 +1,4 @@
-function correctedDnaSequences = discardOverlapSpots(dnaSequences,dirCy3,parameters)
+function dataOut = discardOverlapSpots(dataIn,dirCy3,parameters)
 
 [imRaw, stitchROI] = stitchArrayImages(dirCy3{1},parameters.overlap,parameters.angularDisplacementTile,parameters.rangePositions,1,-1);
 im = preprocessImage(imRaw,parameters.angularDisplacement,parameters.roi);
@@ -8,7 +8,7 @@ T = Trot * Tcrop;
 [~,~,centroids] = arrayGridMask(im,parameters.pxSize,parameters.topLeftCorner,0);
 centroidsRaw = convertCoord(reshape(centroids,[],2),T,1);
 
-discardSpots = false(size(dnaSequences));
+discardSpots = false(size(dataIn));
 bordersX= unique(stitchROI(:,:,1));
 bordersY= unique(stitchROI(:,:,3));
 spotRadius = 15;
@@ -19,5 +19,9 @@ for i=1:size(centroidsRaw,1)
         discardSpots(i)= true;
     end
 end
-correctedDnaSequences = dnaSequences;
-correctedDnaSequences(discardSpots)={''};
+dataOut = dataIn;
+if iscell(dataOut)
+    dataOut(discardSpots)={''};
+else
+    dataOut(discardSpots)=1;
+end

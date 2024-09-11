@@ -36,7 +36,7 @@ function [ka,kd,eq,dna,dnaTable,kaStderror,kdStderror,eqStderror,countedspots]=c
 %% Parse parameters
 ip = inputParser();
 ip.addRequired('dnaSequences',@(x) iscell(x));
-ip.addRequired('spotIntensities',@(x) iscell(x));
+ip.addRequired('spotIntensities',@(x) isnumeric(x));
 ip.addRequired('operatorSequences',@(x) iscell(x));
 ip.addRequired('randSequence',@(x) isempty(x) || ischar(x) || isstring(x));
 ip.addRequired('mutations',@(x) isnumeric(x));
@@ -46,6 +46,7 @@ ip.addRequired('equilibriumFrames',@(x) isnumeric(x));
 ip.addRequired('timeArray',@(x) isnumeric(x));
 ip.addRequired('lacIConcentration',@(x) isnumeric(x) && numel(x)==1);
 ip.addOptional('kdThreshold',-Inf,@(x) isnumeric(x) && numel(x)==1);
+ip.addOptional('trimCutoff',30,@(x) isnumeric(x) && numel(x)==1);
 ip.parse(varargin{:});
 
 dnaSequences = ip.Results.dnaSequences;
@@ -59,13 +60,16 @@ equilibriumFrames = ip.Results.equilibriumFrames;
 time = ip.Results.timeArray;
 lacIConcentration = ip.Results.lacIConcentration;
 kdThreshold = ip.Results.kdThreshold;
+trimCutoff = ip.Results.trimCutoff;
 %% Compute average spot intensity per frame of the random sequence 
 if isempty(randSeq)
     meanRandSeqValues = 0;
 else
     randSeqIndex = strcmp(dnaSequences,randSeq);
-    randSeqArrays = cell2mat(spotIntensities(randSeqIndex));
-    meanRandSeqValues = trimmean(randSeqArrays,30,1);
+    randSeqArrays = spotIntensities(:,randSeqIndex);
+    meanRandSeqValues = trimmean(randSeqArrays,30,2);
+%     figure, plot(randSeqArrays),hold on
+%     plot(meanRandSeqValues,'k-','LineWidth',2)
 end
 %% Compute kd and ka*lacIConcentation using linear fit
 maxMutationNum = length(operatorSequences{1});
@@ -88,13 +92,13 @@ for i=1:numel(uDnaSequences)
         end
         if any(any(dnaTable(i,:,:)))
             seqIndex = iu==i;
-            operatorValues = cell2mat(spotIntensities(seqIndex));
+            operatorValues = spotIntensities(:,seqIndex);
             ka_spots = nan(1,size(operatorValues,1));
             kd_spots = nan(1,size(operatorValues,1));
             eq_values = nan(1,size(operatorValues,1));
-            for k = 1:size(operatorValues,1)
+            for k = 1:size(operatorValues,2)
                 %compute ka and kd using linear fit
-                spotValues = operatorValues(k,:) - meanRandSeqValues;
+                spotValues = operatorValues(:,k) - meanRandSeqValues;
                 eq_values(k) = mean(spotValues(equilibriumFrames));
                 ka_spots(k) = computeKa(spotValues,time,framesALinearFit,1);
                 kd_spots(k) = computeKd(spotValues,time,framesDLinearFit,'linear','Threshold',kdThreshold);
@@ -129,5 +133,6 @@ kdStderror = kdStderror(ind);
 eq = eq(ind);
 eqStderror = eqStderror(ind);
 countedspots = countedspots(ind);
-%% Get ka by deleting by lacI concentration
+%% Get ka by dividing by lacI concentration
 ka = ka/lacIConcentration;
+kaStderror = kaStderror/lacIConcentration;

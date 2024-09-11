@@ -1,4 +1,4 @@
-function [fluoValues, mask] = processArraysLight(dirFluo,dirOffset,parameters)
+function [fluoValues, bkgValues, mask] = processArraysLight(dirFluo,dirOffset,parameters)
 % Performs analysis of specific operator binding experiments using
 % microarrays without saving preprocessed images. Handles either Cy3 or Cy5
 % images.
@@ -25,6 +25,9 @@ function [fluoValues, mask] = processArraysLight(dirFluo,dirOffset,parameters)
 % Output:
 %   fluoValues - 3D (or 2D for Cy5) array, where (f,i,j) is the intensity
 %                of microarray spot (i,j) at acquisition frame f.
+%   bkgValues  - 3D (or 2D for Cy5) array, where (f,i,j) is the average 
+%                pixel intensity in the neighborhood of microarray spot 
+%                (i,j) at acquisition frame f.
 %   mask - labelled image of microarray spots in the preprocessed images.
 %
 % Spartak Zikrin, Elf lab, 2024-05-17.
@@ -53,10 +56,12 @@ imSize = parameters.roi([4 3])+1;
 slide = zeros(imSize);
 [mask, ~, ~, bkgMask] = arrayGridMask(slide,parameters.pxSize,parameters.topLeftCorner);
 %% Preprocess Cy3 images and extract spot intensities
-tmpValuesCy3 = cell(1,numel(dirFluo));
+tmpFluoValues = cell(1,numel(dirFluo));
+tmpBkgValues = cell(1,numel(dirFluo));
 for i=1:numel(dirFluo)
-    tmpValuesCy3{i} = computeSpotIntensitiesFromRawData(dirFluo{i},parameters.overlap,...
+    [tmpFluoValues{i}, tmpBkgValues{i}] = computeSpotIntensitiesFromRawData(dirFluo{i},parameters.overlap,...
         parameters.angularDisplacementTile,parameters.rangePositions,parameters.posColRange,...
         parameters.weights,parameters.angularDisplacement,parameters.roi,offset,mask,bkgMask);
 end
-fluoValues = squeeze(vertcat(tmpValuesCy3{:}));
+fluoValues = squeeze(vertcat(tmpFluoValues{:}));
+bkgValues = squeeze(vertcat(tmpBkgValues{:}));

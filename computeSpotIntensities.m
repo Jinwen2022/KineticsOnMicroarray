@@ -1,8 +1,9 @@
-function spotIntensities = computeSpotIntensities(im,mask,bkgMask)
+function [spotIntensities, localBkg] = computeSpotIntensities(im,mask,bkgMask)
 % Compute average spot fluorescence insensities in microarray image *im* 
 % using a binary image *mask* with spot locations. If *bkgMask* is provided
 % do local background subtraction.
-% Return either 96x164 or 266x170 matrix with spot intensities.
+% Return either 96x164 or 266x170 matrix with spot intensities and local
+% background values
 props = regionprops(mask,im,'MeanIntensity');
 if numel(props) == 96*164
     nRows = 96;
@@ -20,3 +21,6 @@ if nargin==3 % Apply local background subtraction
     spotIntensities = spotIntensities - localBkg;
 end
 spotIntensities = reshape(spotIntensities,nRows,nCols);
+if nargin==3 && nargout==2
+    localBkg = reshape(localBkg,nRows,nCols);
+end
