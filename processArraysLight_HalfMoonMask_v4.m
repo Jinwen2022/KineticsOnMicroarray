@@ -1,4 +1,4 @@
-function [fluoValues, bkgValues, mask,bkgMask,HalfMoonSpotsIDs] = processArraysLight_HalfMoonMask_v3(dirFluo,dirOffset,parameters,thresholdDNAIndices)
+function [fluoValues, bkgValues, mask,bkgMask,HalfMoonSpotsIDs] = processArraysLight_HalfMoonMask_v4(dirFluo,dirOffset,parameters,thresholdDNAIndices)
 % Performs analysis of specific operator binding experiments using
 % microarrays without saving preprocessed images. Handles either Cy3 or Cy5
 % images. 
