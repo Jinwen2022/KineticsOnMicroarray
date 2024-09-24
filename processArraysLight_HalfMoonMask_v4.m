@@ -72,7 +72,7 @@ else
     imHalfMoon = preprocessImage(slideHalfMoon,parameters.angularDisplacement,parameters.roi);
     imEq = preprocessImage(slideEq,parameters.angularDisplacement,parameters.roi);
 end
-    [mask,~, ~,HalfMoonSpotsIDs, bkgMask] = arrayGridMask_HalfMoonMask_v3(imHalfMoon,imEq,parameters.pxSize,parameters.topLeftCorner,thresholdDNAIndices);
+    [mask,~, ~,HalfMoonSpotsIDs, bkgMask] = arrayGridMask_HalfMoonMask_v4(imHalfMoon,imEq,parameters.pxSize,parameters.topLeftCorner,thresholdDNAIndices);
 %% Preprocess Cy3 images and extract spot intensities
 tmpFluoValues = cell(1,numel(dirFluo));
 tmpBkgValues = cell(1,numel(dirFluo));

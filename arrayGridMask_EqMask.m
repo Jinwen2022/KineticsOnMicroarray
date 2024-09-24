@@ -1,4 +1,4 @@
-function [mask,topLeftCorner, spotCentroids,HalfMoonSpotsIDs, bkgMask] = arrayGridMask_HalfMoonMask_v3(imHalfMoon,imEq,pxSize,topLeftCorner,thresholdDNAIndices,debugFlag,contrast)
+function [maskIni,topLeftCorner, bkgMask,HalfMoonSpotsIDs, mask_HalfMoon_FitEdge] = arrayGridMask_EqMask(im,pxSize,topLeftCorner,thresholdDNAIndices,debugFlag,contrast)
 % Creates a labelled mask of strong binders among microarray spots and optionally a labelled mask for local
 % background subtraction.
 % The spot mask is only 20% of the real spot are in order to deal with
@@ -37,10 +37,10 @@ function [mask,topLeftCorner, spotCentroids,HalfMoonSpotsIDs, bkgMask] = arrayGr
 colSpacing = 0.127*1000/pxSize;
 rowSpacing = 0.073323*1000/pxSize;
 radius = round(0.9*10*pxSize);
-if size(imHalfMoon,1)>rowSpacing*265 && size(imHalfMoon,2)>colSpacing*84
+if size(im,1)>rowSpacing*265 && size(im,2)>colSpacing*84
     NROWS = 266;
     NCOLS = 85;
-elseif size(imHalfMoon,1)>rowSpacing*95 && size(imHalfMoon,2)>colSpacing*81
+elseif size(im,1)>rowSpacing*95 && size(im,2)>colSpacing*81
     NROWS = 96;
     NCOLS = 82;
 else
@@ -48,14 +48,14 @@ else
 end
 
 if nargin<3 || isempty(topLeftCorner)
-    figure, imshow(imHalfMoon(1:round(10*rowSpacing),1:round(10*colSpacing)),[0,660]);
+    figure, imshow(im(1:round(10*rowSpacing),1:round(10*colSpacing)),[0,660]);
     [x,y] = ginput(1);
     topLeftCorner = [x y];
 end
-if nargin<6
+if nargin<5
     debugFlag = false;
 end
-if nargin<7
+if nargin<6
     contrast = [0 660];
 end
 
@@ -63,7 +63,7 @@ spotCentroidsX = topLeftCorner(1):colSpacing:colSpacing*NCOLS;
 spotCentroidsY = topLeftCorner(2):rowSpacing:rowSpacing*NROWS;
 spotCentroids = zeros(NROWS,NCOLS*2,2);
 
-ceedMask = zeros(size(imHalfMoon));
+ceedMask = zeros(size(im));
 [XX, YY] = meshgrid(spotCentroidsX, spotCentroidsY);
 spotCentroids(:,1:2:end,1) = XX;
 spotCentroids(:,1:2:end,2) = YY;
@@ -80,7 +80,7 @@ se = strel('disk',radius,8);
 maskIni = imdilate(ceedMask,se);
 
 if debugFlag
-    figure, imshow(imHalfMoon,contrast), hold on
+    figure, imshow(im,contrast), hold on
     B = bwboundaries(maskIni,'noholes');
     visboundaries(B,'EnhanceVisibility',0,'LineWidth',1);
 end
@@ -91,10 +91,10 @@ rectSe = strel('rectangle',odd([round(rowSpacing*0.95) size(diskSe.Neighborhood,
 bkgMaskIni = imdilate(ceedMask,rectSe);
 bkgMaskIni = bkgMaskIni-outMask;
 if debugFlag
-    figure, imshow(labeloverlay(imadjust(imHalfMoon),bkgMaskIni)),axis image
+    figure, imshow(labeloverlay(imadjust(im),bkgMaskIni)),axis image
 end
 
-[tmpFluoValues,tmpBkg] = computeSpotIntensities(imEq,maskIni,bkgMaskIni);%computed temFluoValues already is reducted by local background: tmpBkg
+[tmpFluoValues,tmpBkg] = computeSpotIntensities(im,maskIni,bkgMaskIni);%computed temFluoValues already is reducted by local background: tmpBkg
 
 %Mask the spots that are most likely to have HalfMoon (unhomogenous
 %binding) pattern, we selected spots that gave stronger binding than O1
@@ -108,7 +108,7 @@ indicesToKeep = ismember(mask_HalfMoon_Loose, susHalfMoonSpotIDs);
 mask_HalfMoon_Loose(indicesToRemove) = 0;
 tempMask = mask_HalfMoon_Loose;
 tempMask(indicesToKeep) = 1;
-temp_im =imEq;
+temp_im =im;
 temp_im(~tempMask) =median(median(tmpBkg));
 if debugFlag
     figure, imshow(temp_im,contrast), hold on
@@ -137,7 +137,7 @@ HalfMoonSpotsIDs = maskIni(circlesMask);
 mask_HalfMoon_FitEdge=mask_HalfMoon_Loose;
 mask_HalfMoon_FitEdge(~circlesMaskDilated) = 0;
 if debugFlag
-    figure, imshow(imHalfMoon,[0,1000]), hold on
+    figure, imshow(im,[0,1000]), hold on
     B = bwboundaries(mask_HalfMoon_FitEdge,'noholes');
     visboundaries(B,'EnhanceVisibility',0,'LineWidth',1);
     title('Masking out exact DNA spot for stronger binders than O1');
@@ -158,11 +158,11 @@ for i = 1:length(uniqueLabels)
     roiMask = (mask_HalfMoon_FitEdge == label);
     spotMask_mask = (mask == label);
     % Extract pixel intensities within this ROI from the image
-    roiIntensities = imHalfMoon(roiMask);
+    roiIntensities = im(roiMask);
     % Determine the threshold for the top 20% of intensities
     threshold = prctile(roiIntensities, 80);  % Top 20% threshold (80th percentile)
     % Keep only the pixels that are above the threshold within this ROI
-    top20Mask = roiMask & (imHalfMoon >= threshold);
+    top20Mask = roiMask & (im >= threshold);
     % Retain the label in the new mask for the top 20% pixels
     maskTop20(top20Mask) = label;
     % Remove label's region in original mask, replace with new top 20% mask
@@ -170,11 +170,10 @@ for i = 1:length(uniqueLabels)
     mask(top20Mask) = label;
 end
 
-
 bkgMask = bkgMaskIni;
 
 if debugFlag
-    figure, imshow(labeloverlay(imadjust(imHalfMoon),bkgMask),contrast), hold on
+    figure, imshow(labeloverlay(imadjust(im),bkgMask),contrast), hold on
     B = bwboundaries(maskTop20,'noholes');
     visboundaries(B,'EnhanceVisibility',0,'LineWidth',1);
     B = bwboundaries(mask,'noholes');
