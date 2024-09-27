@@ -1,46 +1,27 @@
-function [mask,topLeftCorner, spotCentroids,HalfMoonSpotsIDs, bkgMask] = arrayGridMask_HalfMoonMask_v4(imHalfMoon,imEq,pxSize,topLeftCorner,thresholdDNAIndices,debugFlag,contrast)
-Initial Strong Binding Spots Detection:
-Using the initial mask (maskIni) and a background mask (bkgMaskIni) generated based on technical details provided by the DNA microarray manufacturer, the fluorescence intensities for all DNA spots are computed after local background subtraction. Spots with stronger binding than a selected DNA operator (e.g., O1) are considered strong binders. A loose mask (mask_HalfMoon_Loose) is generated for these strong binders, with each region covering an area twice the spot radius.
+function [mask,topLeftCorner, spotCentroids,HalfMoonSpotsIDs, bkgMask] = arrayGridMask_HalfMoonMask_v5(imHalfMoon,imEq,pxSize,topLeftCorner,thresholdDNAIndices,badSpotsMask,debugFlag,contrast)
+% % The arrayGridMask_HalfMoonMask_v4 function creates a labeled mask for microarray spots, 
+% focusing on masking the top 20% of pixels for strong binders and applying similar masks to weak binding spots. 
+% It optionally generates a labeled mask for local background subtraction based on detected spot locations.
+% 
+% Inputs:
+% 
+% imHalfMoon: Preprocessed fluorescence image of the microarray.
+% pxSize: Pixel size in microns.
+% topLeftCorner: (Optional) Coordinates of the top-left spot centroid; if not provided, it can be set via GUI.
+% thresholdDNAIndices: Indices of selected DNA operators that serve as a threshold to define strong binders.
+% badSpotsMask: Array index for discarding unwanted Microarray REGIONS
+% debugFlag: (Optional) Boolean flag to enable or disable debugging visualizations.
+% contrast: (Optional) Intensity value cut-offs for image plotting, defaulting to [0, 660].
 
-Find anchors for mask distortion according to the distortion in microarray Image- Circular Spot Detection for Strong Binders:
-Circular fits are applied to the masked strong binding spots using imfindcircles. The function detects the circular centers of these spots with a specific radius range (0.9 * Spot Radius to 1.8 * Spot Radius). A refined mask (mask_HalfMoon_FitEdge) is created, which accurately represents the detected strong binders with the computed centers and radii.
 
-Transformation of the Initial Mask (maskIni) and Background Mask (bkgMaskIni):
-The strong binders’ centroids serve as anchors to apply a geometric transformation to correct for misalignments in the original ceedMask (which contains centroid positions for all spots in MaskIni). The transformation aligns the entire grid of spots as the alignment for the strong binding centers. The background mask (bkgMaskIni) undergoes the same transformation, creating a more accurate representation of all spots.
-
-Top 20% Pixel Extraction for Strong Binding Spots:
-For each strong binder, the top 20% of pixels (based on intensity) within a whole spot region are retained using a threshold determined from a  binding image showing most obvious pattern of HalfMoon binding (e.g., frame 16). These regions are stored in maskTop20, which is then smoothed using morphological dilation and erosion to ensure cleaner boundaries for the masked strong binding spots.
-
-Half Moon Mask Generation for All Spots Using Strong Binders as Reference:
-The top 20% mask for each strong binder is projected onto its nearby weak spots. This is done by copying the shape of the nearest strong binder's mask and applying it to weak spots based on their proximity. The final mask (finalMask) is generated, where strong binders retain their detected 20% mask, and weaker spots inherit the mask from their nearest strong binder.
-%
-% Input:
-%   im - preprocessed fluo image.
-%   pxSize - pixel size in mum.
-%   topLeftCorner - [x,y] coordinates of the top left spot centroid.
-%                   Optional, if not provided or empty, the centroid is
-%                   set using gui.  Default [].
-%   thresholdDNAIndices - selected certain DNA operator indices in DNA
-%                   array, as the threshold to define strong operators that most likely
-%                   causing unhomogenous binding on DNA spot.
-%   debugFlag - optional, if true plot image with spot outlines. Default
-%               false.
-%   contrast - a tuple with upper and lower pixel intensity value cut-offs
-%              for image plotting. By default, [0 660].
-
-%
-% Output:
-%   mask - an image of the same size as im with segmented and labelled
-%          microarray spots;
-%   topLeftCorner - (x,y)-coordinates of the top left microarray spot
-%                   centroid;
-%   spotCentroids - coordinates of all microarray spot centroids
-%                   HalfMoonSpotsIDs - indices of all deteced strong binders (stronger than
-%                   the input DNA operator that is defined by thresholdDNAIndices)
-%   HalfMoonSpotsIDs - Indices of detected strong binding DNA spots in dna Sequences
-%                   printed on Microarray
-%   bkgMask - optional, a labelled mask of background pixels around
-%             microarray spots
+% Outputs:
+% 
+% mask: A refined mask image with segmented and labeled microarray spots.
+% topLeftCorner: (x, y) coordinates of the top-left microarray spot centroid.
+% spotCentroids: Centroid coordinates of all microarray spots.
+% HalfMoonSpotsIDs: Indices of detected strong binding DNA spots.
+% bkgMask: A labeled mask for background pixels around the microarray spots.
+% Elf lab Jinwen Yuan 2024-09-24
 
 % Step1:
 colSpacing = 0.127*1000/pxSize;
@@ -61,10 +42,10 @@ if nargin<3 || isempty(topLeftCorner)
     [x,y] = ginput(1);
     topLeftCorner = [x y];
 end
-if nargin<6
+if nargin<7
     debugFlag = false;
 end
-if nargin<7
+if nargin<8
     contrast = [0 660];
 end
 
@@ -84,12 +65,11 @@ rcenters = [rcenters; round([XX(:) YY(:)])];
 [~,ind] = sort(rcenters(:,1));
 rcenters = rcenters(ind,:);
 ceedMask(sub2ind(size(ceedMask),rcenters(:,2),rcenters(:,1))) = 1:numel(spotCentroids)/2;
-
 se = strel('disk',radius,8);
 maskIni = imdilate(ceedMask,se);
 
 if debugFlag
-    figure, imshow(imHalfMoon,contrast), hold on
+    figure, imshow(imEq,contrast), hold on
     B = bwboundaries(maskIni,'noholes');
     visboundaries(B,'EnhanceVisibility',0,'LineWidth',1);
     title('Initial mask for computing binding intensities and selecting stronger binders than selected DNA operator')
@@ -101,7 +81,7 @@ rectSe = strel('rectangle',odd([round(rowSpacing*0.95) size(diskSe.Neighborhood,
 bkgMaskIni = imdilate(ceedMask,rectSe);
 bkgMaskIni = bkgMaskIni-outMask;
 if debugFlag
-    figure, imshow(labeloverlay(imadjust(imHalfMoon),bkgMaskIni)),axis image
+    figure, imshow(labeloverlay(imadjust(imEq),bkgMaskIni)),axis image
 end
 
 [tmpFluoValues,tmpBkg] = computeSpotIntensities(imEq,maskIni,bkgMaskIni);%computed temFluoValues already is reducted by local background: tmpBkg
@@ -111,6 +91,7 @@ end
 radius_HalfMoon = round(0.036662*1000/pxSize);
 se_HalfMoon = strel('disk',radius_HalfMoon,8);
 mask_HalfMoon_Loose = imdilate(ceedMask,se_HalfMoon);
+mask_HalfMoon_Loose(badSpotsMask) = 0;
 susHalfMoonSpotIDs = find(tmpFluoValues> mean(tmpFluoValues(thresholdDNAIndices)));
 % Find the positions in mask_HalfMoon_Loose where the values match any of the values in susHalfMoonSpotIDs
 indicesToRemove = ~ismember(mask_HalfMoon_Loose, susHalfMoonSpotIDs);
@@ -121,7 +102,7 @@ tempMask(indicesToKeep) = 1;
 temp_im =imEq;
 temp_im(~tempMask) =median(median(tmpBkg));
 if debugFlag
-    figure, imshow(temp_im,contrast), hold on
+    figure, imshow(imEq,contrast), hold on
     B = bwboundaries(tempMask,'noholes');
     visboundaries(B,'EnhanceVisibility',0,'LineWidth',1);
     title('Only stronger binders than selected DNA operator is masked')
@@ -148,7 +129,7 @@ HalfMoonSpotsIDs = maskIni(circlesMask);
 mask_HalfMoon_FitEdge=mask_HalfMoon_Loose;
 mask_HalfMoon_FitEdge(~circlesMaskDilated) = 0;
 if debugFlag
-    figure, imshow(imHalfMoon,[0,1000]), hold on
+    figure, imshow(imEq,[0,1000]), hold on
     B = bwboundaries(mask_HalfMoon_FitEdge,'noholes');
     visboundaries(B,'EnhanceVisibility',0,'LineWidth',1);
     title('Exact DNA spot for stronger binders  after circule detection with specific radius are masked out');
