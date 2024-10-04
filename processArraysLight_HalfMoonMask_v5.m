@@ -1,4 +1,4 @@
-function [fluoValues, bkgValues, mask,bkgMask,HalfMoonSpotsIDs] = processArraysLight_HalfMoonMask_v5(dirFluo,dirOffset,parameters,thresholdDNAIndices, badSpotsMask)
+function [fluoValues, bkgValues, mask,bkgMask,HalfMoonSpotsIDs] = processArraysLight_HalfMoonMask_v5(dirFluo,dirOffset,parameters,thresholdDNAIndices, badSpots)
 % Performs analysis of specific operator binding experiments using
 % microarrays without saving preprocessed images. Handles either Cy3 or Cy5
 % images. 
@@ -69,12 +69,12 @@ if ~iscell(dirFluo)
     imSize = parameters.roi([4 3])+1;
     im = zeros(imSize);
 else
-    slideHalfMoon = stitchArrayImages(dirFluo{1},parameters.overlap,parameters.angularDisplacementTile,parameters.rangePositions,16);
+    slideHalfMoon = stitchArrayImages(dirFluo{1},parameters.overlap,parameters.angularDisplacementTile,parameters.rangePositions,33);
     slideEq = stitchArrayImages(dirFluo{2},parameters.overlap,parameters.angularDisplacementTile,parameters.rangePositions,1);
     imHalfMoon = preprocessImage(slideHalfMoon,parameters.angularDisplacement,parameters.roi);
     imEq = preprocessImage(slideEq,parameters.angularDisplacement,parameters.roi);
 end
-    [mask,~, ~,HalfMoonSpotsIDs, bkgMask] = arrayGridMask_HalfMoonMask_v5(imHalfMoon,imEq,parameters.pxSize,parameters.topLeftCorner,thresholdDNAIndices,badSpotsMask);
+    [mask,~, ~,HalfMoonSpotsIDs, bkgMask] = arrayGridMask_HalfMoonMask_v5(imHalfMoon,imEq,parameters.pxSize,parameters.topLeftCorner,thresholdDNAIndices,badSpots);
 %% Preprocess Cy3 images and extract spot intensities
 tmpFluoValues = cell(1,numel(dirFluo));
 tmpBkgValues = cell(1,numel(dirFluo));
