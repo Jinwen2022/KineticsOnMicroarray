@@ -12,8 +12,7 @@ function [mask,topLeftCorner, spotCentroids,HalfMoonSpotsIDs, bkgMask] = arrayGr
 % badSpotsMask: Array index for discarding unwanted Microarray REGIONS
 % debugFlag: (Optional) Boolean flag to enable or disable debugging visualizations.
 % contrast: (Optional) Intensity value cut-offs for image plotting, defaulting to [0, 660].
-
-
+%
 % Outputs:
 % 
 % mask: A refined mask image with segmented and labeled microarray spots.
@@ -92,12 +91,9 @@ mask_HalfMoon_Loose = imdilate(ceedMask,se_HalfMoon);
 susHalfMoonSpotIDs = find(tmpFluoValues> mean(tmpFluoValues(thresholdDNAIndices)));
 % Find the positions in mask_HalfMoon_Loose where the values match any of the values in susHalfMoonSpotIDs
 indicesToRemove = ~ismember(mask_HalfMoon_Loose, susHalfMoonSpotIDs);
-indicesToKeep = ismember(mask_HalfMoon_Loose, susHalfMoonSpotIDs);
 mask_HalfMoon_Loose(indicesToRemove) = 0;
-tempMask = mask_HalfMoon_Loose;
-tempMask(indicesToKeep) = 1;
 temp_im =imEq;
-temp_im(~tempMask) =nanmedian(tmpBkg(:));
+temp_im(~mask_HalfMoon_Loose) = nanmedian(tmpBkg(:));
 contrast = [nanmedian(tmpBkg(:)), nanmedian(tmpBkg(:))+ 1.25*nanmax(tmpFluoValues(:))];
 temp_im2 = mat2gray(temp_im, contrast);
 if debugFlag
@@ -113,16 +109,13 @@ end
 %Remove indices in ceedMask that are not detected as strong binders
 medianRadius = round(median(radii));  
 se = strel('disk', medianRadius, 6);
-circlesMask = logical(zeros(size(ceedMask)));
+circlesMask = false(size(ceedMask));
 circleIndices = sub2ind(size(circlesMask), round(centers(:,2)), round(centers(:,1)));
 circlesMask(circleIndices) = 1;
 circlesMaskDilated = imdilate(circlesMask, se);%Mask out the regions that are detected as DNA spot for strong binders
 % Initialize a mask to store the projected values
-ceedMaskFiltered = zeros(size(ceedMask));
-% project values from mask onto positions labelled by circlesMask
-ceedMaskFiltered(circlesMask) = maskIni(circlesMask);  
 HalfMoonSpotsIDs = maskIni(circlesMask);
-mask_HalfMoon_FitEdge=mask_HalfMoon_Loose;
+mask_HalfMoon_FitEdge = mask_HalfMoon_Loose;
 mask_HalfMoon_FitEdge(~circlesMaskDilated) = 0;
 if debugFlag
     figure, imshow(imEq,contrast), hold on
@@ -134,38 +127,35 @@ end
 
 % Step 3: 
 % Use detected circles centers for strong binding spots as anchors to
-% transform  maskIni and bkgMaskIni for maksing DNA microarray more
+% transform  maskIni and bkgMaskIni for masking DNA microarray more
 % accurately 
-% Extract centroids and spot IDs from mask_HalfMoon_FitEdge
-propsHalfMoon = regionprops(mask_HalfMoon_FitEdge, 'Centroid');
-strongBinderCentroids = cat(1, propsHalfMoon.Centroid);
-validStrongBinderIdx = ~any(isnan(strongBinderCentroids), 2);  % Identify valid centroids
-strongBinderCentroids = strongBinderCentroids(validStrongBinderIdx, :);  % Keep only valid centroids
-strongBinderIDs = unique(mask_HalfMoon_FitEdge(mask_HalfMoon_FitEdge > 0)); % Only non-zero strong binder spots
+% Extract centroids and spot IDs from mask_HalfMoon_FitEdge. Pixel values
+% will be used on step 4.
+strongSpotProps = regionprops(mask_HalfMoon_FitEdge,imHalfMoon,'Centroid','Area','PixelValues','PixelList');
+strongSpotLabels = find([strongSpotProps.Area]>0);
+strongSpotProps = strongSpotProps(strongSpotLabels);
+strongSpotCentroids = cat(1, strongSpotProps.Centroid);
 % Extract corresponding centroids from maskIni (matching strong binder IDs)
 ceedMaskProps = regionprops(ceedMask, 'Centroid');
 ceedMaskCentroids = cat(1, ceedMaskProps.Centroid);
 % Get the centroids of the corresponding strong binder IDs in maskIni
-matchingceedMaskCentroids = ceedMaskCentroids(strongBinderIDs, :);
+matchingceedMaskCentroids = ceedMaskCentroids(strongSpotLabels, :);
 % Estimate the geometric transformation (affine) from the centroids
-transformation = fitgeotrans(matchingceedMaskCentroids, strongBinderCentroids, 'affine');
-%Apply the transformation to ceedMask to align it with im
+transformation = fitgeotrans(matchingceedMaskCentroids, strongSpotCentroids, 'affine');
+% Apply the transformation to ceedMask to align it with im
 outputRef = imref2d(size(imHalfMoon));  % Reference the size of image
 ceedMaskTransformed = imwarp(ceedMask, transformation, 'OutputView', outputRef, 'InterpolationMethod', 'nearest');
 % Generate the corrected mask
 correctedMask = imdilate(ceedMaskTransformed, se);
-% correctedMask(mask_HalfMoon_FitEdge > 0) = mask_HalfMoon_FitEdge(mask_HalfMoon_FitEdge > 0); % Replace strong binder areas with precise mask
 if debugFlag
     figure, imshow(labeloverlay(imHalfMoon,maskIni, 'Transparency', 0.3),contrast), hold on
     B = bwboundaries(correctedMask,'noholes');
     visboundaries(B,'EnhanceVisibility',0,'LineWidth',1);
-    title({['Corrected mask(colorful labeloverlay) using transformation'],...
-        ['based on detected strong binders positions'],...
-        ['VS old mask (red boundries)']});
+    title({'Corrected mask(colorful labeloverlay) using transformation',...
+        'based on detected strong binders positions',...
+        'VS old mask (red boundries)'});
 end
-diskSe = strel('disk',round(1.3*radius),6);
 outMask = imdilate(ceedMaskTransformed,diskSe);
-rectSe = strel('rectangle',odd([round(rowSpacing*0.90) size(diskSe.Neighborhood,1)+3]));
 bkgMaskCorrected = imdilate(ceedMaskTransformed,rectSe);
 bkgMaskCorrected = bkgMaskCorrected-outMask;
 if debugFlag
@@ -176,40 +166,30 @@ if debugFlag
 end
 
 
-
 % Step 4:
 % Detect and mask top 20% binding are for each strong binding spot
-
 % Initialize a new mask to store the top 20% regions on strong binding
 % spots
 maskTop20 = zeros(size(mask_HalfMoon_FitEdge));
-mask = correctedMask;
-% Get all unique labels in the mask (excluding zero)
-strongSpotLabels = unique(mask_HalfMoon_FitEdge(mask_HalfMoon_FitEdge > 0));
 % Loop through each unique label (each ROI)
 for i = 1:length(strongSpotLabels)
     % Get the current label (ROI)
     label = strongSpotLabels(i);
-    % Extract the region corresponding to this label from the mask
-    roiMask = (mask_HalfMoon_FitEdge == label);
-    spotMask_mask = (mask == label);
+    p = strongSpotProps(i);
     % Extract pixel intensities within this ROI from the image
-    roiIntensities = imHalfMoon(roiMask);
     % Determine the threshold for the top 20% of intensities
-    threshold = prctile(roiIntensities, 80);  % Top 20% threshold (80th percentile)
+    threshold = prctile(p.PixelValues, 80);  % Top 20% threshold (80th percentile)
     % Keep only the pixels that are above the threshold within this ROI
-    top20Mask = roiMask & (imHalfMoon >= threshold);
+    top20Mask = p.PixelList(p.PixelValues >= threshold,:);
     % Retain the label in the new mask for the top 20% pixels
-    maskTop20(top20Mask) = label;
-    % Remove label's region in original mask, replace with new top 20% mask
-    mask(spotMask_mask) = 0;
-    mask(top20Mask) = label;
+    maskTop20(sub2ind(size(maskTop20),top20Mask(:,2),top20Mask(:,1))) = label;
 end
 % use morphological operations for smoothing
 smoothedTop20Mask = maskTop20;
 se = strel('disk', round(medianRadius/5.3));  
 smoothedTop20Mask = imdilate(smoothedTop20Mask, se);  % Dilate the mask to smooth
 smoothedTop20Mask = imerode(smoothedTop20Mask, se);   % Erode to return to original size after dilation
+% It's (almost) the same as smoothedTop20Mask=imclose(smoothedTop20Mask,se)
 if debugFlag
     figure, imshow(labeloverlay(imadjust(imHalfMoon),maskTop20),contrast), hold on
     B = bwboundaries(correctedMask,'noholes');
@@ -218,43 +198,42 @@ if debugFlag
 end
 
 
-
-
 % Step 5:
 % Compute centroids and labels for both strong and weak spots 
-strongSpotProps = regionprops(mask_HalfMoon_FitEdge>0, "Centroid");
-strongSpotsCentroids = round(cat(1, strongSpotProps.Centroid));
-strongSpotsLabels = mask_HalfMoon_FitEdge(sub2ind(size(mask_HalfMoon_FitEdge),strongSpotsCentroids(:,2),strongSpotsCentroids(:,1)));
 spotProps = regionprops(correctedMask, 'Centroid');
 spotCentroids = round(cat(1, spotProps.Centroid));
-spotCentroids(any(isnan(spotCentroids), 2), :) = [];
-spotIDs = correctedMask(sub2ind(size(correctedMask),spotCentroids(:,2),spotCentroids(:,1)));
 % Find weak binding spots that are not in the strong spots
-[weakSpotIDs,indexWeakSpotIDs] = setdiff(spotIDs, strongSpotsLabels); %spotIDs (indexSpotIDs) = weakSpotIDs
+weakSpotLabels = 1:numel(spotProps);
+weakSpotLabels(strongSpotLabels)=[];
 % Compute distances between all weak and strong centroids
-distancesMatrix = pdist2(spotCentroids(indexWeakSpotIDs, :), strongSpotsCentroids);%Note strongSpotLabels is not correctly posisionted related to strongSpotCentriods
+distancesMatrix = pdist2(spotCentroids(weakSpotLabels, :), strongSpotCentroids);
+[~,nearestIdxs]=min(distancesMatrix,[],2);
 % Initialize final mask
 finalMask = smoothedTop20Mask;
+% Crop in advance all strong spot masks
+strongSpotMasks = zeros(2*medianRadius+1,2*medianRadius+1,length(strongSpotLabels));
+for i = 1:length(strongSpotLabels)
+    c = strongSpotCentroids(i,:);
+    strongSpotMasks(:,:,i) = imcrop(smoothedTop20Mask, [c(1)-medianRadius,c(2)-medianRadius, 2*medianRadius,2*medianRadius]);
+end
 % Loop over each weak spot to copy the nearest strong spot mask
-for i = 1:length(weakSpotIDs)
-    weakLabel = weakSpotIDs(i);
-    weakSpotCentroid = spotCentroids(indexWeakSpotIDs(i),:);
+for i = 1:length(weakSpotLabels)
+    weakLabel = weakSpotLabels(i);
+    weakSpotCentroid = spotCentroids(weakLabel,:);
     % Find the nearest strong binding spot using precomputed distances matrix
-    [~, nearestIdx] = min(distancesMatrix(i, :));
-    nearestStrongspotCentroid = strongSpotsCentroids (nearestIdx,:);
     % Crop the mask for the nearest strong spot (top 20% mask)
-    nearestStrongSpotHalfMoonMask = imcrop(smoothedTop20Mask, [nearestStrongspotCentroid(1)-medianRadius,nearestStrongspotCentroid(2)-medianRadius, 2*medianRadius,2*medianRadius]);
-    transformedStrongSpotMask = double(logical(nearestStrongSpotHalfMoonMask))*weakLabel;
+    nearestStrongSpotHalfMoonMask = strongSpotMasks(:,:,nearestIdxs(i));
+    transformedStrongSpotMask = nearestStrongSpotHalfMoonMask;
+    transformedStrongSpotMask(nearestStrongSpotHalfMoonMask>0) = weakLabel;
     % Define weak spot dimensions
-    weakXsCols = weakSpotCentroid(1)-medianRadius:weakSpotCentroid(1)+medianRadius;
-    weakYsRows = weakSpotCentroid(2)-medianRadius:weakSpotCentroid(2)+medianRadius;
-    % Adjust rows and cols to fit within image bounds
-    validWeakXsCols = weakXsCols(weakXsCols > 0 & weakXsCols <= size(finalMask, 2));
-    validWeakYsRows = weakYsRows(weakYsRows > 0 & weakYsRows <= size(finalMask, 1));
+    weakXsCols = max(1,weakSpotCentroid(1)-medianRadius):min(size(finalMask, 2),weakSpotCentroid(1)+medianRadius);
+    weakYsRows = max(1,weakSpotCentroid(2)-medianRadius):min(size(finalMask, 1),weakSpotCentroid(2)+medianRadius);
     % Resize the strong spot mask to fit within the weak spot dimensions
-    transformedStrongSpotMask = imresize(transformedStrongSpotMask, [length(validWeakYsRows), length(validWeakXsCols)], 'nearest');
+    if any([length(weakYsRows), length(weakXsCols)]<2*medianRadius+1)
+        transformedStrongSpotMask = imresize(transformedStrongSpotMask, [length(weakYsRows), length(weakXsCols)], 'nearest');
+    end
     % Assign the resized strong spot mask to the finalMask at the weak spot location
-    finalMask(validWeakYsRows, validWeakXsCols) = transformedStrongSpotMask;
+    finalMask(weakYsRows, weakXsCols) = transformedStrongSpotMask;
 end
 
 
