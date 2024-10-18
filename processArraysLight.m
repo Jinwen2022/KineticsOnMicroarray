@@ -1,7 +1,13 @@
-function [fluoValues, bkgValues, mask] = processArraysLight(dirFluo,dirOffset,parameters)
+function [fluoValues, bkgValues, mask,bkgMask,HalfMoonSpotsIDs] = processArraysLight(dirFluo,dirOffset,parameters,thresholdDNAIndices, badSpots)
 % Performs analysis of specific operator binding experiments using
 % microarrays without saving preprocessed images. Handles either Cy3 or Cy5
-% images.
+% images. 
+
+% This function computes the top 20% Cy3values on strong binders'
+% DNA spot, which is defined stronger as give stronger Cy3values than
+% selected DNA (thresholdDNAIndices) in equilibrium with averaged spot
+% Intensity values. Local background reduction is done by using original
+% bkgMask
 %
 % Input:
 %   dirFluo - Path to directory (or cell array with paths to directories)
@@ -21,6 +27,10 @@ function [fluoValues, bkgValues, mask] = processArraysLight(dirFluo,dirOffset,pa
 %       topLeftCorner - [x y] coordinates of the centroid of the
 %                       (imaginary) spot in the top left corner of
 %                       preprocessed image.
+%   thresholdDNAIndices - chosen DNA operator's indexes in DNA array for
+%                       computing strong binder's fluoValues
+%   badSpotsMask - badSpots logical array generated from manuelly labelled badSpotsMask, to discrad unwanted
+%   DNA spots.
 %
 % Output:
 %   fluoValues - 3D (or 2D for Cy5) array, where (f,i,j) is the intensity
@@ -28,9 +38,12 @@ function [fluoValues, bkgValues, mask] = processArraysLight(dirFluo,dirOffset,pa
 %   bkgValues  - 3D (or 2D for Cy5) array, where (f,i,j) is the average 
 %                pixel intensity in the neighborhood of microarray spot 
 %                (i,j) at acquisition frame f.
-%   mask - labelled image of microarray spots in the preprocessed images.
+%   HalfMoonSpotsIDs - labels of strong DNA binding spots
+%   mask - labelled image of spots suspicious of Unhomogenous binding in the preprocessed images.
+%   bkgMask - labelled image of spots suspicious of Unhomogenous binding's local background in the preprocessed images
 %
 % Spartak Zikrin, Elf lab, 2024-05-17.
+% Jinwen Yuan, Modified, 2024-09-19.
 %% Parse parameters
 if ~isfield(parameters,'rangePositions')
     parameters.rangePositions = [];
@@ -52,9 +65,11 @@ else
     offset = 0;
 end
 %% Compute spot mask and background mask
-imSize = parameters.roi([4 3])+1;
-slide = zeros(imSize);
-[mask, ~, ~, bkgMask] = arrayGridMask(slide,parameters.pxSize,parameters.topLeftCorner);
+slideHalfMoon = stitchArrayImages(dirFluo{1},parameters.overlap,parameters.angularDisplacementTile,parameters.rangePositions,33);
+slideEq = stitchArrayImages(dirFluo{2},parameters.overlap,parameters.angularDisplacementTile,parameters.rangePositions,1);
+imHalfMoon = preprocessImage(slideHalfMoon,parameters.angularDisplacement,parameters.roi);
+imEq = preprocessImage(slideEq,parameters.angularDisplacement,parameters.roi);
+[mask,~, ~,HalfMoonSpotsIDs, bkgMask] = arrayGridMask_HalfMoonMask(imHalfMoon,imEq,parameters.pxSize,parameters.topLeftCorner,thresholdDNAIndices,badSpots);
 %% Preprocess Cy3 images and extract spot intensities
 tmpFluoValues = cell(1,numel(dirFluo));
 tmpBkgValues = cell(1,numel(dirFluo));

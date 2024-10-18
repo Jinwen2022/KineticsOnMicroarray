@@ -1,5 +1,5 @@
-function [mask,topLeftCorner, spotCentroids,HalfMoonSpotsIDs, bkgMask] = arrayGridMask_HalfMoonMask_v5(imHalfMoon,imEq,pxSize,topLeftCorner,thresholdDNAIndices,badSpots,debugFlag,contrast)
-% % The arrayGridMask_HalfMoonMask_v4 function creates a labeled mask for microarray spots, 
+function [mask,topLeftCorner, spotCentroids,HalfMoonSpotsIDs, bkgMask] = arrayGridMask_HalfMoonMask(imHalfMoon,imEq,pxSize,topLeftCorner,thresholdDNAIndices,badSpots,debugFlag,contrast)
+% The arrayGridMask_HalfMoonMask_v4 function creates a labeled mask for microarray spots, 
 % focusing on masking the top 20% of pixels for strong binders and applying similar masks to weak binding spots. 
 % It optionally generates a labeled mask for local background subtraction based on detected spot locations.
 % 
